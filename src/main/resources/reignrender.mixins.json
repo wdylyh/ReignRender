@@ -1,0 +1,16 @@
+{
+	"required": true,
+	"package": "com.wdylyh.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"EntityRenderDispatcherMixin",
+		"WorldRendererMixin",
+		"SectionRenderStateMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

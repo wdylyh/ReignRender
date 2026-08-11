@@ -1,0 +1,16 @@
+{
+  "reignrender.gui.title.configs": "ReignRender Render Control %s",
+  "reignrender.config.disable.prettyName.disableParticles": "Disable Particles",
+  "reignrender.config.disable.comment.disableParticles": "When enabled, particles will not be rendered",
+  "reignrender.config.disable.name.disableParticles": "Disable Particles",
+  "reignrender.config.disable.prettyName.disableEntities": "Disable Entities",
+  "reignrender.config.disable.comment.disableEntities": "When enabled, entities will not be rendered",
+  "reignrender.config.disable.name.disableEntities": "Disable Entities",
+  "reignrender.config.disable.prettyName.disableBlocks": "Disable Blocks",
+  "reignrender.config.disable.comment.disableBlocks": "When enabled, blocks will not be rendered",
+  "reignrender.config.disable.name.disableBlocks": "Disable Blocks",
+  "reignrender.config.disable.prettyName.openConfigGui": "Open Config GUI",
+  "reignrender.config.disable.name.openConfigGui": "Open Config GUI",
+  "reignrender.hotkeys.category.disable": "Disable Rendering",
+  "reignrender.hotkeys.category.generic": "Generic Hotkeys"
+}

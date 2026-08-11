@@ -1,0 +1,16 @@
+{
+  "reignrender.gui.title.configs": "ReignRender 渲染控制 %s",
+  "reignrender.config.disable.prettyName.disableParticles": "禁用粒子渲染",
+  "reignrender.config.disable.comment.disableParticles": "关闭后粒子将不再显示",
+  "reignrender.config.disable.name.disableParticles": "禁用粒子",
+  "reignrender.config.disable.prettyName.disableEntities": "禁用实体渲染",
+  "reignrender.config.disable.comment.disableEntities": "关闭后实体将不再显示",
+  "reignrender.config.disable.name.disableEntities": "禁用实体",
+  "reignrender.config.disable.prettyName.disableBlocks": "禁用方块渲染",
+  "reignrender.config.disable.comment.disableBlocks": "关闭后方块将不再显示",
+  "reignrender.config.disable.name.disableBlocks": "禁用方块",
+  "reignrender.config.disable.prettyName.openConfigGui": "打开配置界面",
+  "reignrender.config.disable.name.openConfigGui": "打开配置界面",
+  "reignrender.hotkeys.category.disable": "禁用渲染",
+  "reignrender.hotkeys.category.generic": "通用快捷键"
+}
