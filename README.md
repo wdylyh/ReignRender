@@ -16,25 +16,30 @@
 1. 禁止粒子渲染  
 2. 禁止生物渲染  
 3. 禁止方块渲染  
-
+4. 禁止方块实体渲染  
+5. 禁止下落方块渲染  
+6. 禁止盔甲渲染  
+7. 禁止迷雾渲染
+8. 可以禁止告示牌渲染的情况下渲染告示牌文字  
 ---
 
 ## 利用的机制
 
 | 功能 | 对应拦截点 |
 |------|------------|
-| 粒子 | `renderParticles` |
-| 实体 | `EntityRenderManager.render()` |
-| 方块 | `renderBlockLayers`、`renderSection` |
+| 方块 | `ChunkRendererRegion.getBlockState` |
+| 流体 | `FluidRenderer.render`、`BlockRenderManager.renderFluid` |
+| 方块实体 | `BlockEntityRenderManager.getRenderState`、`SignBlockEntityRenderer.renderSign` |
+| 实体 | `EntityRenderManager.shouldRender` |
+| 粒子 | `WorldRenderer.renderParticles`、`ParticleManager.addParticle` |
+| 盔甲 | `ArmorFeatureRenderer.render` |
+| 雾效 | `FogRenderer.applyFog` |
 
 ---
 
 ## 性能提升
 
-> 本模组在正常游玩情况下作用微乎其微，以下场景作用较大：
-
-- 大量实体渲染（如动物农场、生物集群）  
-- 过多粒子效果（如爆炸、药水云、火焰）  
+> 无较大提升，单纯视觉效果
 
 > **注意**：本模组仅控制渲染，计算依然会进行（实体 AI、方块更新等不受影响）。
 

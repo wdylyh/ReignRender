@@ -1,0 +1,188 @@
+[21:48:44] [main/INFO]: Loading Minecraft 1.21.11 with Fabric Loader 0.19.3
+[21:48:44] [main/INFO]: Loading 51 mods:
+	- fabric-api 0.141.6+1.21.11
+	   |-- fabric-api-base 1.0.5+4ebb5c083e
+	   |-- fabric-api-lookup-api-v1 1.6.114+20dc27073e
+	   |-- fabric-biome-api-v1 17.1.1+4fc5413f3e
+	   |-- fabric-block-api-v1 1.1.10+4ebb5c083e
+	   |-- fabric-block-view-api-v2 1.0.39+4ebb5c083e
+	   |-- fabric-command-api-v2 2.4.7+6b42a6003e
+	   |-- fabric-content-registries-v0 10.2.14+4fc5413f3e
+	   |-- fabric-convention-tags-v1 2.1.55+7f945d5b3e
+	   |-- fabric-convention-tags-v2 2.17.3+8ef948ba3e
+	   |-- fabric-crash-report-info-v1 0.3.23+4ebb5c083e
+	   |-- fabric-data-attachment-api-v1 1.8.48+eed0806f3e
+	   |-- fabric-data-generation-api-v1 23.5.0+88d7da613e
+	   |-- fabric-dimensions-v1 4.0.28+4fc5413f3e
+	   |-- fabric-entity-events-v1 3.1.1+1d0ab4303e
+	   |-- fabric-events-interaction-v0 4.1.1+3b89ecf63e
+	   |-- fabric-game-rule-api-v1 2.0.3+4fc5413f3e
+	   |-- fabric-item-api-v1 11.6.0+67f17bb43e
+	   |-- fabric-item-group-api-v1 4.2.36+4fc5413f3e
+	   |-- fabric-key-binding-api-v1 1.1.7+4fc5413f3e
+	   |-- fabric-lifecycle-events-v1 2.6.15+4ebb5c083e
+	   |-- fabric-loot-api-v2 3.0.73+3f89f5a53e
+	   |-- fabric-loot-api-v3 2.0.20+78c8b4663e
+	   |-- fabric-message-api-v1 6.1.12+4ebb5c083e
+	   |-- fabric-model-loading-api-v1 6.0.15+4fc5413f3e
+	   |-- fabric-networking-api-v1 5.1.6+6b6d71a53e
+	   |-- fabric-object-builder-api-v1 21.1.40+4fc5413f3e
+	   |-- fabric-particles-v1 4.2.12+4fc5413f3e
+	   |-- fabric-recipe-api-v1 8.2.4+4ebb5c083e
+	   |-- fabric-registry-sync-v0 6.2.6+1718722b3e
+	   |-- fabric-renderer-api-v1 8.0.3+f4ffd2e53e
+	   |-- fabric-renderer-indigo 5.0.3+f4ffd2e53e
+	   |-- fabric-rendering-fluids-v1 3.1.43+4ebb5c083e
+	   |-- fabric-rendering-v1 16.2.10+0290ad933e
+	   |-- fabric-resource-conditions-api-v1 5.0.35+4fc5413f3e
+	   |-- fabric-resource-loader-v0 3.3.4+4fc5413f3e
+	   |-- fabric-resource-loader-v1 1.0.10+78c8b4663e
+	   |-- fabric-screen-api-v1 3.1.7+4ebb5c083e
+	   |-- fabric-screen-handler-api-v1 1.3.162+4fc5413f3e
+	   |-- fabric-serialization-api-v1 1.0.5+4ebb5c083e
+	   |-- fabric-sound-api-v1 1.0.51+4fc5413f3e
+	   |-- fabric-tag-api-v1 1.3.0+88d7da613e
+	   |-- fabric-transfer-api-v1 6.0.25+4fc5413f3e
+	   \-- fabric-transitive-access-wideners-v1 7.1.0+014c8cec3e
+	- fabricloader 0.19.3
+	   \-- mixinextras 0.5.4
+	- java 21
+	- malilib 0.27.16
+	   \-- conditional-mixin 0.6.4
+	- minecraft 1.21.11
+	- reignrender 1.0.0
+[21:48:44] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/D:/.minecraft/libraries/net/fabricmc/sponge-mixin/0.17.3+mixin.0.8.7/sponge-mixin-0.17.3+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[21:48:44] [main/INFO]: Compatibility level set to JAVA_21
+[21:48:45] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.4).
+[21:48:46] [Datafixer Bootstrap/INFO]: 287 Datafixer optimizations took 266 milliseconds
+[21:48:49] [main/INFO]: Sodium: [N/F], Iris: [N/F]
+[21:48:49] [Render thread/INFO]: Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, profilesHost=https://api.mojang.com, name=PROD]
+[21:48:49] [Render thread/INFO]: Setting user: wdylyh
+[21:48:49] [Render thread/INFO]: ReignRender initialized!
+[21:48:49] [Render thread/INFO]: [Indigo] Registering Indigo renderer!
+[21:48:49] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[21:48:50] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access, GL_EXT_texture_filter_anisotropic
+[21:48:50] [Render thread/INFO]: Reloading ResourceManager: vanilla, conditional-mixin, fabric-api, fabric-api-base, fabric-api-lookup-api-v1, fabric-biome-api-v1, fabric-block-api-v1, fabric-block-view-api-v2, fabric-command-api-v2, fabric-content-registries-v0, fabric-convention-tags-v1, fabric-convention-tags-v2, fabric-crash-report-info-v1, fabric-data-attachment-api-v1, fabric-data-generation-api-v1, fabric-dimensions-v1, fabric-entity-events-v1, fabric-events-interaction-v0, fabric-game-rule-api-v1, fabric-item-api-v1, fabric-item-group-api-v1, fabric-key-binding-api-v1, fabric-lifecycle-events-v1, fabric-loot-api-v2, fabric-loot-api-v3, fabric-message-api-v1, fabric-model-loading-api-v1, fabric-networking-api-v1, fabric-object-builder-api-v1, fabric-particles-v1, fabric-recipe-api-v1, fabric-registry-sync-v0, fabric-renderer-api-v1, fabric-renderer-indigo, fabric-rendering-fluids-v1, fabric-rendering-v1, fabric-resource-conditions-api-v1, fabric-resource-loader-v0, fabric-resource-loader-v1, fabric-screen-api-v1, fabric-screen-handler-api-v1, fabric-serialization-api-v1, fabric-sound-api-v1, fabric-tag-api-v1, fabric-transfer-api-v1, fabric-transitive-access-wideners-v1, fabricloader, malilib, reignrender
+[21:48:50] [Render thread/INFO]: i18nLang#load: File: '/assets/malilib/lang/en_us.json' has been loaded successfully
+[21:48:50] [Render thread/WARN]: i18nOptionManager#buildLanguageOptions(malilib): Detected [12] available options.
+[21:48:50] [Render thread/INFO]: Carpet: [N/F], CarpetTIS: [N/F]
+[21:48:50] [Render thread/INFO]: i18nLang#load: File: '/assets/malilib/lang/zh_cn.json' has been loaded successfully
+[21:48:50] [Render thread/INFO]: i18nOptionManager#setLang(malilib): Language: 'zh_cn' - has been loaded successfully.
+[21:48:50] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":false,"hotkey":{"keys":"J"}}
+[21:48:50] [Render thread/INFO]: [ReignRender] render config 'disableFluids' changed to: {"enabled":false,"hotkey":{"keys":"K"}}
+[21:48:50] [Render thread/INFO]: [ReignRender] filter config 'filteredEntities' changed to: minecraft:slime
+[21:48:50] [Render thread/INFO]: [ReignRender] render config 'filteredEntities' changed to: minecraft:slime
+[21:48:50] [Worker-Main-5/INFO]: Found unifont_all_no_pua-17.0.01.hex, loading
+[21:48:50] [Render thread/INFO]: [ReignRender] filter config 'blockMode' changed to: whitelist
+[21:48:50] [Worker-Main-3/INFO]: Found unifont_pua-17.0.01.hex, loading
+[21:48:50] [Render thread/INFO]: [ReignRender] render config 'blockMode' changed to: whitelist
+[21:48:50] [Render thread/INFO]: [ReignRender] filter config 'filteredBlocks' changed to: minecraft:obsidian
+[21:48:50] [Render thread/INFO]: [ReignRender] render config 'filteredBlocks' changed to: minecraft:obsidian
+[21:48:50] [Render thread/INFO]: [ReignRender] filter config 'filteredFluids' changed to: 1, , minecraft:lava
+[21:48:50] [Render thread/INFO]: [ReignRender] render config 'filteredFluids' changed to: 1, , minecraft:lava
+[21:48:50] [Render thread/INFO]: [ReignRender] filter config 'blockEntityMode' changed to: blacklist
+[21:48:50] [Render thread/INFO]: [ReignRender] render config 'blockEntityMode' changed to: blacklist
+[21:48:50] [Render thread/INFO]: [ReignRender] filter config 'filteredBlockEntities' changed to: minecraft:lime_shulker_box
+[21:48:50] [Render thread/INFO]: [ReignRender] render config 'filteredBlockEntities' changed to: minecraft:lime_shulker_box
+[21:48:50] [Render thread/INFO]: [ReignRender] filter config 'particleMode' changed to: blacklist
+[21:48:50] [Render thread/INFO]: [ReignRender] render config 'particleMode' changed to: blacklist
+[21:48:50] [Render thread/INFO]: [ReignRender] filter config 'filteredParticles' changed to: minecraft:angry_villager, minecraft:block
+[21:48:50] [Render thread/INFO]: [ReignRender] render config 'filteredParticles' changed to: minecraft:angry_villager, minecraft:block
+[21:48:50] [Worker-Main-7/INFO]: Found unifont_jp_patch-17.0.01.hex, loading
+[21:48:51] [Render thread/INFO]: OpenAL initialized on device OpenAL Soft on 扬声器 (MCHOSE V9 PRO)
+[21:48:51] [Render thread/INFO]: Sound engine started
+[21:48:51] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 128x128x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 2048x2048x4 minecraft:textures/atlas/blocks.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 256x128x0 minecraft:textures/atlas/celestials.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/beds.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/items.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 1024x1024x0 minecraft:textures/atlas/gui.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/signs.png-atlas
+[21:48:51] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[21:49:08] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[21:49:09] [Render thread/INFO]: Loaded 1470 recipes
+[21:49:09] [Render thread/INFO]: Loaded 1584 advancements
+[21:49:09] [Render thread/INFO]: Applied 0 biome modifications to 0 of 65 new biomes in 924.4 μs
+[21:49:09] [Server thread/INFO]: Starting integrated minecraft server version 1.21.11
+[21:49:09] [Server thread/INFO]: Generating keypair
+[21:49:10] [Server thread/INFO]: Loading 0 persistent chunks...
+[21:49:10] [Server thread/INFO]: 准备生成区域中：16%
+[21:49:10] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[21:49:10] [Server thread/INFO]: 准备生成区域中：16%
+[21:49:10] [Server thread/INFO]: Time elapsed: 663 ms
+[21:49:10] [Server thread/INFO]: wdylyh[local:E:e5942053] logged in with entity id 1 at (28.374663837271488, -63.0, -11.358917641080593)
+[21:49:10] [Server thread/INFO]: wdylyh加入了游戏
+[21:49:11] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":false,"hotkey":{"keys":"J"}}
+[21:49:11] [Render thread/INFO]: [ReignRender] render config 'disableFluids' changed to: {"enabled":false,"hotkey":{"keys":"K"}}
+[21:49:11] [Server thread/INFO]: Changing view distance to 12, from 10
+[21:49:11] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[21:49:11] [Render thread/INFO]: Loaded 131 advancements
+[21:49:11] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[21:49:11] [Render thread/INFO]: Resizing Chunk Sections UBO, capacity limit of 2 reached during a single frame. New capacity will be 8.
+[21:49:11] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[21:49:11] [Server thread/INFO]: Saving and pausing game...
+[21:49:11] [Render thread/INFO]: Resizing Chunk Sections UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[21:49:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:overworld
+[21:49:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:the_nether
+[21:49:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:the_end
+[21:49:11] [Render thread/INFO]: Resizing Chunk Sections UBO, capacity limit of 16 reached during a single frame. New capacity will be 32.
+[21:49:11] [Render thread/INFO]: Resizing Chunk Sections UBO, capacity limit of 32 reached during a single frame. New capacity will be 64.
+[21:49:21] [Render thread/INFO]: Resizing Chunk Sections UBO, capacity limit of 64 reached during a single frame. New capacity will be 128.
+[21:49:21] [Render thread/INFO]: Resizing Chunk Sections UBO, capacity limit of 128 reached during a single frame. New capacity will be 256.
+[21:49:30] [Render thread/INFO]: [ReignRender] filter config 'blockMode' changed to: off
+[21:49:30] [Render thread/INFO]: [ReignRender] render config 'blockMode' changed to: off
+[21:49:30] [Render thread/INFO]: [ReignRender] filter config 'blockMode' changed to: blacklist
+[21:49:30] [Render thread/INFO]: [ReignRender] render config 'blockMode' changed to: blacklist
+[21:49:31] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":false,"hotkey":{"keys":"J"}}
+[21:49:31] [Render thread/INFO]: [ReignRender] render config 'disableFluids' changed to: {"enabled":false,"hotkey":{"keys":"K"}}
+[21:49:34] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":true,"hotkey":{"keys":"J"}}
+[21:49:34] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":true,"hotkey":{"keys":"J"}}
+[21:49:35] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":true,"hotkey":{"keys":"J"}}
+[21:49:35] [Render thread/INFO]: [ReignRender] render config 'disableFluids' changed to: {"enabled":false,"hotkey":{"keys":"K"}}
+[21:49:36] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":false,"hotkey":{"keys":"J"}}
+[21:49:36] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":false,"hotkey":{"keys":"J"}}
+[21:49:36] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":true,"hotkey":{"keys":"J"}}
+[21:49:36] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":true,"hotkey":{"keys":"J"}}
+[21:49:39] [Render thread/INFO]: [ReignRender] filter config 'blockMode' changed to: whitelist
+[21:49:39] [Render thread/INFO]: [ReignRender] render config 'blockMode' changed to: whitelist
+[21:49:40] [Render thread/INFO]: [ReignRender] filter config 'blockMode' changed to: off
+[21:49:40] [Render thread/INFO]: [ReignRender] render config 'blockMode' changed to: off
+[21:49:41] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":false,"hotkey":{"keys":"J"}}
+[21:49:41] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":false,"hotkey":{"keys":"J"}}
+[21:49:41] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":true,"hotkey":{"keys":"J"}}
+[21:49:41] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":true,"hotkey":{"keys":"J"}}
+[21:49:42] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":false,"hotkey":{"keys":"J"}}
+[21:49:42] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":false,"hotkey":{"keys":"J"}}
+[21:49:43] [Render thread/INFO]: [ReignRender] filter config 'blockMode' changed to: blacklist
+[21:49:43] [Render thread/INFO]: [ReignRender] render config 'blockMode' changed to: blacklist
+[21:49:43] [Render thread/INFO]: [ReignRender] filter config 'blockMode' changed to: whitelist
+[21:49:43] [Render thread/INFO]: [ReignRender] render config 'blockMode' changed to: whitelist
+[21:49:44] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":true,"hotkey":{"keys":"J"}}
+[21:49:44] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":true,"hotkey":{"keys":"J"}}
+[21:49:45] [Render thread/INFO]: [ReignRender] render config 'disableBlocks' changed to: {"enabled":true,"hotkey":{"keys":"J"}}
+[21:49:45] [Render thread/INFO]: [ReignRender] render config 'disableFluids' changed to: {"enabled":false,"hotkey":{"keys":"K"}}
+[21:49:46] [Server thread/INFO]: Saving and pausing game...
+[21:49:46] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:overworld
+[21:49:46] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:the_nether
+[21:49:46] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:the_end
+[21:49:47] [Server thread/INFO]: wdylyh lost connection: 连接中断
+[21:49:47] [Server thread/INFO]: wdylyh退出了游戏
+[21:49:47] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[21:49:47] [Server thread/INFO]: Stopping server
+[21:49:47] [Server thread/INFO]: Saving players
+[21:49:47] [Server thread/INFO]: Saving worlds
+[21:49:47] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:overworld
+[21:49:47] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:the_nether
+[21:49:47] [Server thread/INFO]: Saving chunks for level 'ServerLevel[新的世界]'/minecraft:the_end
+[21:49:47] [Server thread/INFO]: ThreadedAnvilChunkStorage (新的世界 (1)): All chunks are saved
+[21:49:47] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[21:49:47] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[21:49:47] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[21:49:48] [Render thread/INFO]: Stopping!

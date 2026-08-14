@@ -5,7 +5,14 @@
 	"mixins": [
 		"EntityRenderDispatcherMixin",
 		"WorldRendererMixin",
-		"SectionRenderStateMixin"
+		"BlockEntityRenderManagerMixin",
+		"FluidRendererMixin",
+		"ArmorFeatureRendererMixin",
+		"FogRendererMixin",
+		"SignBlockEntityRendererMixin",
+		"BlockRenderManagerMixin",
+		"SectionBuilderMixin",
+		"ParticleManagerMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
