@@ -40,13 +40,10 @@ public class ParticleManagerMixin {
     @Inject(method = "addParticle(Lnet/minecraft/client/particle/Particle;)V",
             at = @At("HEAD"), cancellable = true)
     private void onAddParticle(Particle particle, CallbackInfo ci) {
-        if (!Configs.Disable.DISABLE_PARTICLES.getBooleanValue()) {
-            return;
-        }
-        if (particle instanceof BlockDustParticle) {
-            if (FilterRules.isParticleFiltered(ParticleTypes.BLOCK)) {
-                ci.cancel();
-            }
+        if (Configs.Disable.DISABLE_PARTICLES.getBooleanValue()
+                && particle instanceof BlockDustParticle
+                && FilterRules.isParticleFiltered(ParticleTypes.BLOCK)) {
+            ci.cancel();
         }
     }
 }

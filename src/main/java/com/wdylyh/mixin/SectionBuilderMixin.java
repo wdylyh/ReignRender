@@ -14,6 +14,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(SectionBuilder.class)
 public class SectionBuilderMixin {
 
+    private static final BlockState AIR_STATE = Blocks.AIR.getDefaultState();
+
     // Replaces the block state of filtered blocks with air right where the
     // chunk mesh builder reads it from the region. Air produces no model
     // vertices, no fluid and no occlusion data, so the filtered block simply
@@ -28,7 +30,7 @@ public class SectionBuilderMixin {
 
         if (Configs.Disable.DISABLE_BLOCKS.getBooleanValue() &&
                 FilterRules.isBlockFiltered(state)) {
-            return Blocks.AIR.getDefaultState();
+            return AIR_STATE;
         }
 
         return state;

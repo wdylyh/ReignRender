@@ -21,17 +21,26 @@ import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.render.RenderUtils;
 import fi.dy.masa.malilib.util.StringUtils;
 import net.minecraft.block.Block;
+import net.minecraft.block.CarpetBlock;
 import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.EquippableComponent;
 import net.minecraft.entity.EntityType;
 import net.minecraft.fluid.Fluid;
+import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.SpawnEggItem;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.world.biome.Biome;
 
 /**
  * Custom picker GUI for a single blacklist/whitelist filter list.
@@ -51,6 +60,7 @@ public class GuiFilterListPicker extends GuiBase
     private final FilterKind kind;
     private final ConfigStringList config;
     private final List<FilterEntry> entries = new ArrayList<>();
+    private Set<String> selectedIds = Collections.emptySet();
     private String searchText = "";
     private int scrollOffset;
 
@@ -84,6 +94,7 @@ public class GuiFilterListPicker extends GuiBase
             this.buildEntries();
         }
 
+        this.selectedIds = new HashSet<>(this.config.getStrings());
         this.rebuildRows();
     }
 
@@ -159,16 +170,15 @@ public class GuiFilterListPicker extends GuiBase
         // Copy to a new list so setStrings() detects the change and fires the callback
         List<String> current = new ArrayList<>(this.config.getStrings());
 
-        if (current.contains(id))
-        {
-            current.remove(id);
-        }
-        else
+        // remove() returns true if the id was present, replacing the separate
+        // contains() + remove() passes with a single O(n) lookup
+        if (!current.remove(id))
         {
             current.add(id);
         }
 
         this.config.setStrings(current);
+        this.selectedIds = new HashSet<>(current);
         FilterRules.invalidateCaches();
     }
 
@@ -181,6 +191,8 @@ public class GuiFilterListPicker extends GuiBase
             case FLUIDS -> this.buildFluidEntries();
             case BLOCK_ENTITIES -> this.buildBlockEntityEntries();
             case PARTICLES -> this.buildParticleEntries();
+            case ARMOR -> this.buildArmorEntries();
+            case FOGS -> this.buildFogEntries();
         }
 
         this.entries.sort(Comparator.comparing(FilterEntry::id));
@@ -225,17 +237,17 @@ public class GuiFilterListPicker extends GuiBase
 
         for (Identifier id : ids)
         {
-            // Blocks backed by a managed block entity type (copper chests, signs,
-            // shulker boxes, ...) are handled by the block entity filter list,
-            // so they are not offered in the block picker
-            if (FilterRules.isBlockManagedByBlockEntityFilter(Registries.BLOCK.get(id)))
+            Block block = Registries.BLOCK.get(id);
+
+            if (block == null)
             {
                 continue;
             }
 
-            Block block = Registries.BLOCK.get(id);
-
-            if (block == null)
+            // Blocks backed by a managed block entity type (copper chests, signs,
+            // shulker boxes, ...) are handled by the block entity filter list,
+            // so they are not offered in the block picker
+            if (FilterRules.isBlockManagedByBlockEntityFilter(block))
             {
                 continue;
             }
@@ -366,13 +378,86 @@ public class GuiFilterListPicker extends GuiBase
         }
     }
 
+    private void buildArmorEntries()
+    {
+        List<Identifier> ids = new ArrayList<>(Registries.ITEM.getIds());
+        Collections.sort(ids);
+
+        for (Identifier id : ids)
+        {
+            Item item = Registries.ITEM.get(id);
+
+            if (item == null)
+            {
+                continue;
+            }
+
+            EquippableComponent equippable = item.getComponents().get(DataComponentTypes.EQUIPPABLE);
+
+            // Only offer pieces that are rendered as armor on a biped (head,
+            // chest, legs, feet). Horse armor and the like are not handled by
+            // ArmorFeatureRenderer.
+            if (equippable == null || !equippable.slot().isArmorSlot())
+            {
+                continue;
+            }
+
+            // Carpets are technically equippable on the head, but they are not
+            // armor and clutters the picker, so they are not offered here.
+            if (item instanceof BlockItem blockItem && blockItem.getBlock() instanceof CarpetBlock)
+            {
+                continue;
+            }
+
+            ItemStack icon = new ItemStack(item);
+            this.entries.add(new FilterEntry(id.toString(), icon.getName().getString(), icon));
+        }
+    }
+
+    private void buildFogEntries()
+    {
+        // Camera submersion based fog types; no registry for them.
+        this.entries.add(new FilterEntry("water", "water", new ItemStack(Items.WATER_BUCKET)));
+        this.entries.add(new FilterEntry("lava", "lava", new ItemStack(Items.LAVA_BUCKET)));
+        this.entries.add(new FilterEntry("powder_snow", "powder_snow", new ItemStack(Items.POWDER_SNOW_BUCKET)));
+        this.entries.add(new FilterEntry("atmospheric", "atmospheric", null));
+
+        // Biome based fog: entries are the biome registry ids, matched against
+        // the biome the camera is currently in. Requires a loaded world.
+        ClientWorld world = MinecraftClient.getInstance().world;
+
+        if (world == null)
+        {
+            return;
+        }
+
+        Registry<Biome> biomeRegistry = world.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
+        List<Identifier> ids = new ArrayList<>(biomeRegistry.getIds());
+        Collections.sort(ids);
+
+        for (Identifier id : ids)
+        {
+            String translationKey = "biome." + id.getNamespace() + "." + id.getPath();
+            String display = Text.translatable(translationKey).getString();
+
+            if (display.equals(translationKey))
+            {
+                display = id.toString();
+            }
+
+            this.entries.add(new FilterEntry(id.toString(), display, null));
+        }
+    }
+
     public enum FilterKind
     {
         ENTITIES(Configs.Filter.FILTERED_ENTITIES, "reignrender.gui.title.filter.entities"),
         BLOCKS(Configs.Filter.FILTERED_BLOCKS, "reignrender.gui.title.filter.blocks"),
         FLUIDS(Configs.Filter.FILTERED_FLUIDS, "reignrender.gui.title.filter.fluids"),
         BLOCK_ENTITIES(Configs.Filter.FILTERED_BLOCK_ENTITIES, "reignrender.gui.title.filter.blockEntities"),
-        PARTICLES(Configs.Filter.FILTERED_PARTICLES, "reignrender.gui.title.filter.particles");
+        PARTICLES(Configs.Filter.FILTERED_PARTICLES, "reignrender.gui.title.filter.particles"),
+        ARMOR(Configs.Filter.FILTERED_ARMOR, "reignrender.gui.title.filter.armor"),
+        FOGS(Configs.Filter.FILTERED_FOGS, "reignrender.gui.title.filter.fogs");
 
         private final ConfigStringList config;
         private final String titleKey;
@@ -394,13 +479,18 @@ public class GuiFilterListPicker extends GuiBase
         }
     }
 
-    private record FilterEntry(String id, String displayName, ItemStack icon)
+    private record FilterEntry(String id, String displayName, ItemStack icon, String displayNameLower)
     {
+        FilterEntry(String id, String displayName, ItemStack icon)
+        {
+            this(id, displayName, icon, displayName.toLowerCase(Locale.ROOT));
+        }
+
         boolean matchesSearch(String search)
         {
             return search.isEmpty() ||
                    this.id.contains(search) ||
-                   this.displayName.toLowerCase(Locale.ROOT).contains(search);
+                   this.displayNameLower.contains(search);
         }
     }
 
@@ -420,7 +510,7 @@ public class GuiFilterListPicker extends GuiBase
             super.render(ctx, mouseX, mouseY, selected);
 
             boolean hovered = this.isMouseOver(mouseX, mouseY);
-            boolean checked = GuiFilterListPicker.this.config.getStrings().contains(this.entry.id());
+            boolean checked = GuiFilterListPicker.this.selectedIds.contains(this.entry.id());
 
             // Cell background so the grid reads as solid cells
             RenderUtils.drawRect(ctx, this.x, this.y, this.width, this.height, 0xFF202020);

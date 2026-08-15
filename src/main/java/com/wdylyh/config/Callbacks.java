@@ -40,6 +40,18 @@ public class Callbacks {
         Configs.Filter.FILTERED_FLUIDS.setValueChangeCallback(Callbacks::onFilterConfigChanged);
         Configs.Filter.FILTERED_BLOCK_ENTITIES.setValueChangeCallback(Callbacks::onFilterConfigChanged);
         Configs.Filter.FILTERED_PARTICLES.setValueChangeCallback(Callbacks::onFilterConfigChanged);
+
+        // Armor and fog are evaluated per frame and are not baked into chunk
+        // meshes, so their changes only need the id caches invalidated.
+        Configs.Filter.ARMOR_MODE.setValueChangeCallback(Callbacks::onFrameFilterConfigChanged);
+        Configs.Filter.FOG_MODE.setValueChangeCallback(Callbacks::onFrameFilterConfigChanged);
+        Configs.Filter.FILTERED_ARMOR.setValueChangeCallback(Callbacks::onFrameFilterConfigChanged);
+        Configs.Filter.FILTERED_FOGS.setValueChangeCallback(Callbacks::onFrameFilterConfigChanged);
+    }
+
+    private static void onFrameFilterConfigChanged(IConfigBase config) {
+        FilterRules.invalidateCaches();
+        LOGGER.info("[ReignRender] frame filter config '{}' changed to: {}", config.getName(), describeConfigValue(config));
     }
 
     private static void onFilterConfigChanged(IConfigBase config) {
@@ -67,8 +79,9 @@ public class Callbacks {
         int maxX = center.x + distance;
         int minZ = center.z - distance;
         int maxZ = center.z + distance;
-        int minY = ChunkSectionPos.getSectionCoord(mc.world.getDimension().minY());
-        int maxY = ChunkSectionPos.getSectionCoord(mc.world.getDimension().minY() + mc.world.getDimension().height() - 1);
+        var dimension = mc.world.getDimension();
+        int minY = ChunkSectionPos.getSectionCoord(dimension.minY());
+        int maxY = ChunkSectionPos.getSectionCoord(dimension.minY() + dimension.height() - 1);
 
         mc.worldRenderer.scheduleChunkRenders(minX, minY, minZ, maxX, maxY, maxZ);
     }

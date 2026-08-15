@@ -1,7 +1,6 @@
 package com.wdylyh.client.gui;
 
 import net.minecraft.client.gui.Click;
-import com.wdylyh.config.Configs;
 import fi.dy.masa.malilib.config.IConfigStringList;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.button.ConfigButtonStringList;
@@ -28,24 +27,15 @@ public class FilterPickerButton extends ConfigButtonStringList
 
     private static GuiFilterListPicker.FilterKind resolveKind(IConfigStringList config)
     {
-        if (config == Configs.Filter.FILTERED_ENTITIES)
+        for (GuiFilterListPicker.FilterKind kind : GuiFilterListPicker.FilterKind.values())
         {
-            return GuiFilterListPicker.FilterKind.ENTITIES;
-        }
-        if (config == Configs.Filter.FILTERED_BLOCKS)
-        {
-            return GuiFilterListPicker.FilterKind.BLOCKS;
-        }
-        if (config == Configs.Filter.FILTERED_FLUIDS)
-        {
-            return GuiFilterListPicker.FilterKind.FLUIDS;
-        }
-        if (config == Configs.Filter.FILTERED_BLOCK_ENTITIES)
-        {
-            return GuiFilterListPicker.FilterKind.BLOCK_ENTITIES;
+            if (config == kind.getConfig())
+            {
+                return kind;
+            }
         }
 
-        return GuiFilterListPicker.FilterKind.PARTICLES;
+        return GuiFilterListPicker.FilterKind.FOGS;
     }
 
     @Override

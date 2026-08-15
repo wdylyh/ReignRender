@@ -8,9 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ReignRender implements ModInitializer {
-	public static final String MOD_ID = "reignrender";
-
-	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+	public static final Logger LOGGER = LoggerFactory.getLogger(Reference.MOD_ID);
 
 	@Override
 	public void onInitialize() {
@@ -20,6 +18,6 @@ public class ReignRender implements ModInitializer {
 	}
 
 	public static Identifier id(String path) {
-		return Identifier.of(MOD_ID, path);
+		return Identifier.of(Reference.MOD_ID, path);
 	}
 }

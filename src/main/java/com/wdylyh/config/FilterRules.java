@@ -1,22 +1,31 @@
 package com.wdylyh.config;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import fi.dy.masa.malilib.config.value.BaseOptionListConfigValue;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.enums.CameraSubmersionType;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.EntityType;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.particle.ParticleType;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.biome.Biome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +43,19 @@ public class FilterRules {
     private static final Set<String> fluids = new HashSet<>();
     private static final Set<String> blockEntities = new HashSet<>();
     private static final Set<String> particles = new HashSet<>();
+    private static final Set<String> armor = new HashSet<>();
+    private static final Set<String> fogs = new HashSet<>();
+
+    // Pre-computed lowercase enum names so isFogFiltered does not allocate a
+    // new String on every frame. CameraSubmersionType has only a handful of
+    // constants, so this map is tiny.
+    private static final EnumMap<CameraSubmersionType, String> FOG_TYPE_NAMES = new EnumMap<>(CameraSubmersionType.class);
+    static {
+        for (CameraSubmersionType t : CameraSubmersionType.values()) {
+            FOG_TYPE_NAMES.put(t, t.name().toLowerCase(Locale.ROOT));
+        }
+    }
+
     private static boolean dirty = true;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FilterRules.class);
@@ -59,12 +81,16 @@ public class FilterRules {
             fluids.clear();
             blockEntities.clear();
             particles.clear();
+            armor.clear();
+            fogs.clear();
 
             entities.addAll(Configs.Filter.FILTERED_ENTITIES.getStrings());
             blocks.addAll(Configs.Filter.FILTERED_BLOCKS.getStrings());
             fluids.addAll(Configs.Filter.FILTERED_FLUIDS.getStrings());
             blockEntities.addAll(Configs.Filter.FILTERED_BLOCK_ENTITIES.getStrings());
             particles.addAll(Configs.Filter.FILTERED_PARTICLES.getStrings());
+            armor.addAll(Configs.Filter.FILTERED_ARMOR.getStrings());
+            fogs.addAll(Configs.Filter.FILTERED_FOGS.getStrings());
 
             // A config change means the old logged decisions are stale.
             loggedBlockDecisions.clear();
@@ -184,6 +210,72 @@ public class FilterRules {
     }
 
     /**
+     * Returns true when the given armor piece should be hidden. The list stores
+     * item registry ids (e.g. "minecraft:diamond_helmet").
+     */
+    public static boolean isArmorFiltered(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        rebuildCacheIfDirty();
+        BaseOptionListConfigValue mode = Configs.Filter.ARMOR_MODE.getOptionValue();
+        // With the master "disable armor" toggle on, an OFF mode means
+        // every armor piece is hidden; otherwise the blacklist/whitelist applies.
+        if (mode == Configs.Filter.MODE_OFF) {
+            return true;
+        }
+        String id = idToString(Registries.ITEM.getId(stack.getItem()));
+        return id != null && isFiltered(mode, armor, id);
+    }
+
+    /**
+     * Returns true when the fog currently being drawn should be hidden.
+     * <p>
+     * Java edition has no fog registry, so a fog instance is identified by a set
+     * of "identities":
+     * <ul>
+     *   <li>the camera submersion type ("water", "lava", "powder_snow", "atmospheric"),</li>
+     *   <li>the biome id at the camera position (e.g. "minecraft:swamp"),</li>
+     *   <li>the dimension id (e.g. "minecraft:overworld").</li>
+     * </ul>
+     * A blacklist hides the fog when any identity is listed, a whitelist only
+     * shows the fog when at least one identity is listed.
+     */
+    public static boolean isFogFiltered(CameraSubmersionType type, ClientWorld world, Vec3d pos) {
+        if (type == null) {
+            return false;
+        }
+        rebuildCacheIfDirty();
+        BaseOptionListConfigValue mode = Configs.Filter.FOG_MODE.getOptionValue();
+        // With the master "disable fog" toggle on, an OFF mode means
+        // every fog type is hidden; otherwise the blacklist/whitelist applies.
+        if (mode == Configs.Filter.MODE_OFF) {
+            return true;
+        }
+
+        boolean anyInList = fogs.contains(FOG_TYPE_NAMES.get(type));
+
+        if (!anyInList && world != null && pos != null) {
+            RegistryEntry<Biome> biome = world.getBiome(BlockPos.ofFloored(pos));
+            if (biome != null) {
+                anyInList = biome.getKey()
+                        .map(key -> fogs.contains(key.getValue().toString()))
+                        .orElse(false);
+            }
+        }
+
+        if (!anyInList && world != null) {
+            anyInList = fogs.contains(world.getRegistryKey().getValue().toString());
+        }
+
+        if (mode == Configs.Filter.MODE_BLACKLIST) {
+            return anyInList;
+        }
+        // Whitelist: hide the fog when none of its identities is listed.
+        return !anyInList;
+    }
+
+    /**
      * Returns true when the given block is backed by a block entity type that is
      * managed by the block entity filter list (e.g. every shulker box color, sign
      * wood, banner color or copper chest oxidation stage).
@@ -193,13 +285,14 @@ public class FilterRules {
             return false;
         }
 
-        for (Identifier id : Registries.BLOCK_ENTITY_TYPE.getIds()) {
-            if (Configs.Filter.BLOCK_ENTITY_TYPE_IDS.contains(id.toString())) {
-                BlockEntityType<?> type = Registries.BLOCK_ENTITY_TYPE.get(id);
+        BlockState state = block.getDefaultState();
 
-                if (type != null && type.supports(block.getDefaultState())) {
-                    return true;
-                }
+        for (String id : Configs.Filter.BLOCK_ENTITY_TYPE_IDS) {
+            Identifier identifier = Identifier.tryParse(id);
+            BlockEntityType<?> type = identifier != null ? Registries.BLOCK_ENTITY_TYPE.get(identifier) : null;
+
+            if (type != null && type.supports(state)) {
+                return true;
             }
         }
 
@@ -212,9 +305,10 @@ public class FilterRules {
      * loading the config to clean up leftovers from older versions.
      */
     public static void cleanUpBlockFilter() {
+        List<String> current = Configs.Filter.FILTERED_BLOCKS.getStrings();
         List<String> blocks = new ArrayList<>();
 
-        for (String rawId : Configs.Filter.FILTERED_BLOCKS.getStrings()) {
+        for (String rawId : current) {
             Identifier id = Identifier.tryParse(rawId);
             Block block = id != null ? Registries.BLOCK.get(id) : null;
 
@@ -223,7 +317,7 @@ public class FilterRules {
             }
         }
 
-        if (blocks.size() != Configs.Filter.FILTERED_BLOCKS.getStrings().size()) {
+        if (blocks.size() != current.size()) {
             Configs.Filter.FILTERED_BLOCKS.setStrings(blocks);
         }
     }
@@ -237,10 +331,11 @@ public class FilterRules {
      * removed as well. Called after loading the config.
      */
     public static void expandBlockEntityFilter() {
+        List<String> current = Configs.Filter.FILTERED_BLOCK_ENTITIES.getStrings();
         List<String> result = new ArrayList<>();
         Set<String> seen = new HashSet<>();
 
-        for (String rawId : Configs.Filter.FILTERED_BLOCK_ENTITIES.getStrings()) {
+        for (String rawId : current) {
             Identifier id = Identifier.tryParse(rawId);
 
             if (id == null || !Configs.Filter.BLOCK_ENTITY_TYPE_IDS.contains(id.toString())) {
@@ -282,7 +377,7 @@ public class FilterRules {
             }
         }
 
-        if (result.size() != Configs.Filter.FILTERED_BLOCK_ENTITIES.getStrings().size()) {
+        if (result.size() != current.size()) {
             Configs.Filter.FILTERED_BLOCK_ENTITIES.setStrings(result);
         }
     }

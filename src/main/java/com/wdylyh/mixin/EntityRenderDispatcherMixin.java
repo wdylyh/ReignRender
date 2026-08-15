@@ -24,10 +24,12 @@ public class EntityRenderDispatcherMixin {
     private void onShouldRender(Entity entity, Frustum frustum,
                                 double offsetX, double offsetY, double offsetZ,
                                 CallbackInfoReturnable<Boolean> cir) {
-        if ((Configs.Disable.DISABLE_ENTITIES.getBooleanValue() &&
-                FilterRules.isEntityFiltered(entity.getType())) ||
-                (Configs.Disable.DISABLE_FALLING_BLOCKS.getBooleanValue() &&
-                        entity instanceof FallingBlockEntity)) {
+        // The cheaper FallingBlockEntity check comes first so it can short-circuit
+        // before the expensive isEntityFiltered() lookup when both toggles are on.
+        if ((Configs.Disable.DISABLE_FALLING_BLOCKS.getBooleanValue() &&
+                entity instanceof FallingBlockEntity) ||
+                (Configs.Disable.DISABLE_ENTITIES.getBooleanValue() &&
+                        FilterRules.isEntityFiltered(entity.getType()))) {
             cir.setReturnValue(false);
         }
     }

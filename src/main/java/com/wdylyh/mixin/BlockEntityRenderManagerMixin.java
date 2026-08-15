@@ -28,7 +28,9 @@ public class BlockEntityRenderManagerMixin {
                 FilterRules.isBlockEntityFiltered(blockEntity)) {
             // When every block entity is hidden (filter mode OFF) and "Keep Sign
             // Text" is enabled, allow sign states so the text can still render.
-            if (Configs.Generic.KEEP_SIGN_TEXT.getBooleanValue() && blockEntity instanceof SignBlockEntity &&
+            // instanceof is cheapest and most discriminating, so it goes first.
+            if (blockEntity instanceof SignBlockEntity &&
+                    Configs.Generic.KEEP_SIGN_TEXT.getBooleanValue() &&
                     Configs.Filter.BLOCK_ENTITY_MODE.getOptionValue() == Configs.Filter.MODE_OFF) {
                 return;
             }

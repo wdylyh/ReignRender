@@ -19,7 +19,7 @@ public class GuiConfigs extends GuiConfigsBase implements IConfigGuiAllTab {
     private static ConfigGuiTab tab = ConfigGuiTab.HOTKEYS;
 
     public GuiConfigs() {
-        super(10, 50, Reference.MOD_ID, null, "reignrender.gui.title.configs", String.format("%s", Reference.MOD_VERSION));
+        super(10, 50, Reference.MOD_ID, null, "reignrender.gui.title.configs", Reference.MOD_VERSION);
     }
 
     @Override
@@ -68,7 +68,7 @@ public class GuiConfigs extends GuiConfigsBase implements IConfigGuiAllTab {
     public List<ConfigOptionWrapper> getConfigs() {
         ConfigGuiTab tab = GuiConfigs.tab;
 
-        if (tab == ConfigGuiTab.ALL && this.useAllTab()) {
+        if (tab == ConfigGuiTab.ALL) {
             return this.getAllConfigs();
         }
         else if (tab == ConfigGuiTab.GENERIC) {

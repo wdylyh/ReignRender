@@ -40,17 +40,8 @@ public class WidgetConfigOptionFilter extends WidgetConfigOption
         String configName = config.getConfigGuiDisplayName();
         this.addLabel(x, y + 7, labelWidth, 8, 0xFFFFFFFF, configName);
 
-        String comment = null;
         IConfigInfoProvider infoProvider = this.host.getHoverInfoProvider();
-
-        if (infoProvider != null)
-        {
-            comment = infoProvider.getHoverInfo(config);
-        }
-        else
-        {
-            comment = config.getComment();
-        }
+        String comment = infoProvider != null ? infoProvider.getHoverInfo(config) : config.getComment();
 
         if (comment != null)
         {
