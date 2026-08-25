@@ -1,12 +1,40 @@
 pluginManagement {
-	repositories {
-		maven {
-			name = 'Fabric'
-			url = 'https://maven.fabricmc.net/'
-		}
-		mavenCentral()
-		gradlePluginPortal()
-	}
+    repositories {
+        // 添加阿里云镜像（放在最前面）
+        maven {
+            name = "Aliyun"
+            url = "https://maven.aliyun.com/repository/public"
+        }
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+// 添加全局仓库配置
+dependencyResolutionManagement {
+    repositories {
+        maven {
+            name = "Aliyun"
+            url = "https://maven.aliyun.com/repository/public"
+        }
+        maven {
+            name = "Aliyun Spring"
+            url = "https://maven.aliyun.com/repository/spring"
+        }
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        maven {
+            name = "Minecraft"
+            url = "https://libraries.minecraft.net"
+        }
+        mavenCentral()
+    }
 }
 
 // Should match your modid

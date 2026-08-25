@@ -16,10 +16,10 @@
 	"environment": "client",
 	"entrypoints": {
 		"main": [
-			"com.wdylyh.ReignRender"
+			"com.wdylyh.RR"
 		],
 		"fabric-datagen": [
-			"com.wdylyh.ReignRenderDataGenerator"
+			"com.wdylyh.Datagen"
 		]
 	},
 	"mixins": [
