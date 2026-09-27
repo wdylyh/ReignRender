@@ -4,13 +4,22 @@ plugins {
 }
 
 repositories {
-	flatDir {
-		dirs "${project.rootDir}/malilib-LTS-1.21.11/build/libs"
+	// 聚合镜像：代理 Mojang 库、Fabric 仓库和 Maven Central 通用依赖
+	maven {
+		name = "Lss233-Minecraft"
+		url = "https://lss233.littleservice.cn/repositories/minecraft/"
 	}
-	maven { url = "https://masa.dy.fi/maven/sakura-ryoko"
-		content {includeGroupAndSubgroups("fi.dy.masa")}
+	// MaLiLib 专用仓库
+	maven {
+		url = "https://masa.dy.fi/maven/sakura-ryoko"
+		content { includeGroupAndSubgroups("fi.dy.masa") }
 	}
-	maven { url = 'https://maven.fallenbreath.me/releases' }
+	// FallenBreath 仓库
+	maven {
+		url = 'https://maven.fallenbreath.me/releases'
+	}
+	// 通用后备仓库
+	mavenCentral()
 }
 
 loom {
@@ -40,8 +49,8 @@ dependencies {
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
-	// MaLiLib (masa's library mod)
-	modImplementation "fi.dy.masa.malilib:malilib-fabric-${project.minecraft_version}:${project.malilib_version}"
+	// MaLiLib (masa's library mod) —— 直接引用本地构建出的 jar
+	modImplementation files("${project.rootDir}/malilib-LTS-1.21.11/build/libs/malilib-fabric-1.21.11-0.27.16.jar")
 }
 
 processResources {
