@@ -16,15 +16,10 @@
 
 ## 兼容性 / Compatibility
 
-| 项目 | 要求 |
+| 项目 / Item | 要求 / Requirement |
 |------|------|
-| **游戏版本** | Fabric 1.21.11 |
-| **前置模组** | malilib 0.27.16 或更高版本 |
-
-| Item | Requirement |
-|------|-------------|
-| **Game Version** | Fabric 1.21.11 |
-| **Dependency** | malilib 0.27.16 or higher |
+| **游戏版本 / Game Version** | Fabric 1.21.11 |
+| **前置模组 / Dependency** | malilib 0.27.16 或更高版本 / malilib 0.27.16 or higher |
 
 ---
 
@@ -32,7 +27,7 @@
 
 **禁止渲染 / Disable Rendering**
 
-| # | 类别 | 说明 |
+| # | 类别 / Category | 说明 / Description |
 |---|------|------|
 | 1 | 禁用粒子渲染 / Disable Particle Rendering | 禁用所有粒子效果 / Disable all particle effects |
 | 2 | 禁用实体渲染 / Disable Entity Rendering | 禁用所有实体 / Disable all entities |
@@ -61,7 +56,7 @@
 
 **替换渲染 / Replacement Rendering**
 
-| # | 类别 | 说明 |
+| # | 类别 / Category | 说明 / Description |
 |---|------|------|
 | 1 | 替换粒子渲染 / Replace Particle Rendering | 替换所有粒子效果 / Replace all particle effects |
 | 2 | 替换实体渲染 / Replace Entity Rendering | 替换所有实体 / Replace all entities |
@@ -83,7 +78,7 @@
 
 **面修改 / Face Modification**
 
-| # | 类别 | 说明 |
+| # | 类别 / Category | 说明 / Description |
 |---|------|------|
 | 1 | 修改粒子贴图 / Modify Particle Textures | 修改所有粒子贴图 / Modify all particle textures |
 | 2 | 修改实体贴图 / Modify Entity Textures | 修改所有实体 / Modify all entities |
@@ -104,19 +99,19 @@
 
 **名单过滤 / List Filtering**
 
-| # | 类别 | 说明 |
+| # | 类别 / Category | 说明 / Description |
 |---|------|------|
 | 1 | 关闭 / Off | 不启用名单功能 / Do not enable list filtering |
 | 2 | 黑名单 / Blacklist | 仅禁止渲染名单内 id / Only disable rendering of IDs in the list |
 | 3 | 白名单 / Whitelist | 仅**不**禁止渲染名单内 id / Only **do not** disable rendering of IDs in the list |
-
-> 仅禁止渲染功能拥有，替换渲染和面修改无 / Only available for the Disable Rendering feature; Replacement Rendering and Face Modification do not have this.
 
 ---
 
 **其余 / Others**
 
 > 还有一些细碎功能，暂不描述。/ There are some minor features not described here yet.
+
+---
 
 ## 其他 / Other
 
@@ -132,6 +127,6 @@
 
 **兼容性 / Compatibility**
 
-> 兼容性良好，只要模组注册id符合原版语法，即可正常工作。/Compatibility is good; as long as the mod's registered ID follows vanilla syntax, it will work normally.
+> 兼容性良好，只要模组注册id符合原版语法，即可正常工作。/ Compatibility is good; as long as the mod's registered ID follows vanilla syntax, it will work normally.
 
 ---
