@@ -1,6 +1,7 @@
 package com.wdylyh.mixin;
 
 import com.wdylyh.config.RenderConfig;
+import com.wdylyh.config.ConditionEngine;
 import com.wdylyh.config.CoordinateFilter;
 import com.wdylyh.config.FilterEngine;
 import com.wdylyh.config.ReplacementEngine;
@@ -83,20 +84,23 @@ public class EntityRenderFilter {
             return;
         }
 
-        // Per-id render count/distance limits, gated by their own master
-        // switches and independent of the per-category filters (they apply
-        // even when the entity filter is off). The count limit consumes one
-        // unit of the per-frame budget; the distance limit compares the
-        // entity position against the camera position (the cx/cy/cz
-        // arguments of shouldRender).
-        if (RenderConfig.Hotkeys.TOGGLE_COUNT_LIMITS.getBooleanValue() &&
-                FilterEngine.countLimitExceeded(FilterEngine.getEntityId(e.getType()))) {
+        // Per-id render count/distance limits from the condition system,
+        // gated by their own master switches and independent of the
+        // per-category filters (they apply even when the entity filter is
+        // off). The count limit consumes one unit of the per-frame budget;
+        // the distance limit compares the entity position against the camera
+        // position (the cx/cy/cz arguments of shouldRender). Item drops are
+        // matched by their item id (the entity id of every ItemEntity is the
+        // same "minecraft:item", so only the item id is meaningful).
+        String limitId = e instanceof ItemEntity ie && ie.getStack() != null && !ie.getStack().isEmpty()
+                ? FilterEngine.getItemId(ie.getStack().getItem())
+                : FilterEngine.getEntityId(e.getType());
+        if (ConditionEngine.isCountExceeded(limitId, e.getX(), e.getY(), e.getZ())) {
             cbr.setReturnValue(false);
             return;
         }
-        if (RenderConfig.Hotkeys.TOGGLE_DISTANCE_LIMITS.getBooleanValue() &&
-                FilterEngine.distanceLimitExceeded(FilterEngine.getEntityId(e.getType()),
-                        e.getX(), e.getY(), e.getZ(), cx, cy, cz)) {
+        if (ConditionEngine.isDistanceExceeded(limitId,
+                e.getX(), e.getY(), e.getZ(), cx, cy, cz)) {
             cbr.setReturnValue(false);
             return;
         }
@@ -193,7 +197,11 @@ public class EntityRenderFilter {
         // Reset the per-call source pairing first, so a value left behind by a
         // previous call that threw can never be picked up by fixState.
         currentSource.remove();
-        if (!ReplacementEngine.isReplaceEnabled() || e == null) {
+        // No master-switch gate here: the coordinate rules below are gated by
+        // the coordinate replace toggle (global switch OFF) while the global
+        // fallback checks the master switch internally — an outer gate would
+        // make the two mutually exclusive paths impossible to combine.
+        if (e == null) {
             return e;
         }
         // The reveal hotkey skips the replacement (shows the original entity).
@@ -205,7 +213,7 @@ public class EntityRenderFilter {
         // current position decides, the global per-category list is only the
         // fallback.
         String srcId = FilterEngine.getEntityId(srcT);
-        String tId = ReplacementEngine.getReplacementEntityAt(srcId, e.getX(), e.getY(), e.getZ());
+        String tId = ReplacementEngine.getReplacementEntityAt(srcId, e.getX(), e.getY(), e.getZ(), FilterEngine.TYPE_ENTITIES);
         if (tId == null) {
             tId = ReplacementEngine.getReplacementEntity(srcId);
         }

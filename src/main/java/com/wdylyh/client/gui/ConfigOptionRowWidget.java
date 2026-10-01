@@ -35,9 +35,9 @@ import net.minecraft.text.Text;
  *       in manual mode;</li>
  *   <li>the replacement lists open the full screen replacement editor in view
  *       mode and an inline "source=target" text field in manual mode;</li>
- *   <li>the coordinate entries and the coordinate replacement entries open
- *       their own full screen list editors in both modes, since an entry
- *       contains a semicolon separator itself.</li>
+ *   <li>the condition entries open their own full screen list editor in both
+ *       modes, since an entry contains semicolon separated key=value fields
+ *       itself.</li>
  * </ul>
  *
  * The name based STRING rows get a placeholder advertising the semicolon
@@ -121,38 +121,15 @@ public class ConfigOptionRowWidget extends WidgetConfigOption
             return;
         }
 
-        // The coordinate entries list has its own full screen editor. Unlike
-        // the replacement rules ("src=dst") an entry contains a semicolon
-        // separator itself ("x,y,z;id;id"), so it cannot be represented
-        // unambiguously in the inline semicolon-joined field: the editor is
-        // used in both input modes.
-        if (config == RenderConfig.Filters.COORD_ENTRIES)
+        // The condition entries list has its own full screen editor. Unlike
+        // the replacement rules ("src=dst") an entry contains semicolon
+        // separated key=value fields itself ("region=...;dist=...;acts=..."),
+        // so it cannot be represented unambiguously in the inline
+        // semicolon-joined field: the editor is used in both input modes.
+        if (config == RenderConfig.Conditions.CONDITION_ENTRIES)
         {
-            CoordEntryButton btn = new CoordEntryButton(x, y, cw, 20,
-                    RenderConfig.Filters.COORD_ENTRIES, this.host, this.host.getDialogHandler());
-            this.addConfigButtonEntry(x + cw + 2, y, (IConfigResettable) config, btn);
-            return;
-        }
-
-        // The coordinate replacement entries have their own full screen editor
-        // with the same rationale: one entry ("x,y,z;src=dst;src=dst") mixes a
-        // coordinate with semicolon separated rules, so the inline text field
-        // is used in neither input mode.
-        if (config == RenderConfig.Filters.COORD_REPLACE_ENTRIES)
-        {
-            CoordReplaceButton btn = new CoordReplaceButton(x, y, cw, 20,
-                    RenderConfig.Filters.COORD_REPLACE_ENTRIES, this.host, this.host.getDialogHandler());
-            this.addConfigButtonEntry(x + cw + 2, y, (IConfigResettable) config, btn);
-            return;
-        }
-
-        // The region face-mod entries have their own entry list screen (one
-        // row per attached id with a texture edit chain), again because one
-        // entry mixes a coordinate with semicolon separated ids.
-        if (config == RenderConfig.Filters.REGION_FACE_ENTRIES)
-        {
-            RegionFaceListButton btn = new RegionFaceListButton(x, y, cw, 20,
-                    RenderConfig.Filters.REGION_FACE_ENTRIES, this.host, this.host.getDialogHandler());
+            ConditionListButton btn = new ConditionListButton(x, y, cw, 20,
+                    RenderConfig.Conditions.CONDITION_ENTRIES, this.host, this.host.getDialogHandler());
             this.addConfigButtonEntry(x + cw + 2, y, (IConfigResettable) config, btn);
             return;
         }
@@ -174,30 +151,6 @@ public class ConfigOptionRowWidget extends WidgetConfigOption
             {
                 ReplaceListButton btn = new ReplaceListButton(x, y, cw, 20,
                         replaceKind.getCfg(), this.host, this.host.getDialogHandler());
-                this.addConfigButtonEntry(x + cw + 2, y, (IConfigResettable) config, btn);
-            }
-
-            return;
-        }
-
-        // The per-id limit lists (count / distance) have their own full
-        // screen editor in view mode (pick the id in the icon grid, then type
-        // the number) and an inline "id=number" field in manual mode. They
-        // are not picker kinds, so without this branch they would fall
-        // through to the "always manual" path below.
-        LimitListScreen.LimitKind limitKind = LimitListScreen.LimitKind.of((IConfigStringList) config);
-
-        if (limitKind != null)
-        {
-            if (RenderConfig.General.FILTER_INPUT_MODE.getOptionValue() == RenderConfig.General.INPUT_MODE_MANUAL)
-            {
-                addManualField(x, y, cw, limitKind.getCfg(),
-                        "reignrender.gui.filter.placeholder.limit");
-            }
-            else
-            {
-                LimitListButton btn = new LimitListButton(x, y, cw, 20,
-                        limitKind.getCfg(), this.host, this.host.getDialogHandler());
                 this.addConfigButtonEntry(x + cw + 2, y, (IConfigResettable) config, btn);
             }
 
@@ -349,11 +302,7 @@ public class ConfigOptionRowWidget extends WidgetConfigOption
     {
         String key;
 
-        if (LimitListScreen.LimitKind.of(cfg) != null)
-        {
-            key = "reignrender.message.manualInvalidLimit";
-        }
-        else if (ReplaceListScreen.ReplaceKind.of(cfg) != null)
+        if (ReplaceListScreen.ReplaceKind.of(cfg) != null)
         {
             key = "reignrender.message.manualInvalidRule";
         }
@@ -389,16 +338,6 @@ public class ConfigOptionRowWidget extends WidgetConfigOption
 
             IconGridPicker.FKind kind = replaceKind.getKind();
             return s -> rule(kind, s);
-        }
-
-        // The per-id limit lists store "id=number" entries with their own
-        // validator (the id must resolve to an entity/particle registry entry,
-        // the number must be an integer of -1 or greater).
-        LimitListScreen.LimitKind limitKind = LimitListScreen.LimitKind.of(cfg);
-
-        if (limitKind != null)
-        {
-            return ConfigOptionRowWidget::limitPair;
         }
 
         IconGridPicker.FKind fk = IconGridPicker.FKind.of(cfg);
@@ -442,56 +381,6 @@ public class ConfigOptionRowWidget extends WidgetConfigOption
         String tgt = id(kind, raw.substring(eq + 1).trim());
 
         return src != null && tgt != null ? src + "=" + tgt : null;
-    }
-
-    /**
-     * Filters an "id=number" limit entry. The id must resolve to a registry
-     * entry of either the entity or the particle category (the only paths the
-     * limits are applied to), and the number must be an integer of -1 or
-     * greater (-1 meaning unlimited).
-     */
-    private static String limitPair(String raw)
-    {
-        int eq = raw.indexOf('=');
-
-        if (eq <= 0 || eq >= raw.length() - 1)
-        {
-            return null;
-        }
-
-        String idRaw = raw.substring(0, eq).trim();
-        String numRaw = raw.substring(eq + 1).trim();
-
-        if (idRaw.isEmpty() || numRaw.isEmpty())
-        {
-            return null;
-        }
-
-        String norm = idRaw.indexOf(':') >= 0 ? idRaw : "minecraft:" + idRaw;
-
-        if (!IconGridPicker.matches(IconGridPicker.FKind.ENTITIES, norm) &&
-                !IconGridPicker.matches(IconGridPicker.FKind.PARTICLES, norm))
-        {
-            return null;
-        }
-
-        int value;
-
-        try
-        {
-            value = Integer.parseInt(numRaw);
-        }
-        catch (NumberFormatException e)
-        {
-            return null;
-        }
-
-        if (value < -1)
-        {
-            return null;
-        }
-
-        return norm + "=" + value;
     }
 
     /** Any non-empty "src=dst" for the text replacement lists (name tags). */

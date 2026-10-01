@@ -67,7 +67,10 @@ public class HeldItemReplace {
     private static ItemStack getStackInArm(LivingEntity ent, Arm arm) {
         ItemStack stack = ent.getStackInArm(arm);
 
-        if (!ReplacementEngine.isReplaceEnabled() || stack.isEmpty()) {
+        // No master-switch gate: the coordinate rules below are gated by the
+        // coordinate replace toggle (global switch OFF), the global fallback
+        // checks the master switch internally.
+        if (stack.isEmpty()) {
             return stack;
         }
         // The reveal hotkey skips the replacement (shows the original item),
@@ -83,7 +86,7 @@ public class HeldItemReplace {
 
         // Coordinate aware rules win over the global list; the holder's
         // position decides.
-        String tId = ReplacementEngine.getReplacementHeldItemAt(src, ent.getX(), ent.getY(), ent.getZ());
+        String tId = ReplacementEngine.getReplacementHeldItemAt(src, ent.getX(), ent.getY(), ent.getZ(), FilterEngine.TYPE_HELD_ITEMS);
         if (tId == null) {
             tId = ReplacementEngine.getReplacementHeldItem(src);
         }

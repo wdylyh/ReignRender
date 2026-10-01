@@ -19,6 +19,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(FallingBlockEntityRenderer.class)
 public class FallingBlockReplace {
 
+    private static final org.slf4j.Logger LOGGER =
+            org.slf4j.LoggerFactory.getLogger("ReignRender/FallingBlockReplace");
+
+    /** Rate limit for the diagnostic log (ms) — the render loop runs per frame. */
+    private static long lastLog;
+
     // Universal falling block replacement: the render state carries the falling
     // block's block state in movingBlockRenderState.blockState. Swapping it
     // after updateRenderState fills it in makes the renderer draw the target
@@ -40,10 +46,29 @@ public class FallingBlockReplace {
             return;
         }
 
+        // 诊断日志（2 秒限频）：打印替换链路每一步的实时结果，用于定位
+        // "下落方块无法替换" 的断点（实体是否渲染 / 规则是否命中 / 门是否挡住）。
+        long now = System.currentTimeMillis();
+        if (now - lastLog > 2000) {
+            lastLog = now;
+            LOGGER.info("[ReignRender] falling diag: sid={}, pos=({},{},{}), coordEntries={}, coordAt={}, global={}, blocked={}, coordToggle={}, globalSwitch={}",
+                    sid,
+                    ent.getBlockX(), ent.getBlockY(), ent.getBlockZ(),
+                    ReplacementEngine.coordEntryCount(),
+                    ReplacementEngine.getReplacementFallingBlockAt(sid, ent.getX(), ent.getY(), ent.getZ(), FilterEngine.TYPE_FALLING_BLOCKS),
+                    ReplacementEngine.getReplacementFallingBlock(sid),
+                    FilterEngine.isReplaceBlocked(FilterEngine.TYPE_FALLING_BLOCKS),
+                    RenderConfig.Hotkeys.TOGGLE_COORD_REPLACE.getBooleanValue(),
+                    RenderConfig.General.REPLACE_ENABLED.getBooleanValue());
+        }
+
         // (1) Explicit "source=target" replacement rules keep the highest priority.
-        if (ReplacementEngine.isReplaceEnabled() && !FilterEngine.isReplaceBlocked(FilterEngine.TYPE_FALLING_BLOCKS)) {
+        // No master-switch gate: the coordinate rules below are gated by the
+        // coordinate replace toggle (global switch OFF), the global fallback
+        // checks the master switch internally.
+        if (!FilterEngine.isReplaceBlocked(FilterEngine.TYPE_FALLING_BLOCKS)) {
             // 坐标规则优先于全局列表：以下落方块当前位置落点为准。
-            String tid = ReplacementEngine.getReplacementFallingBlockAt(sid, ent.getX(), ent.getY(), ent.getZ());
+            String tid = ReplacementEngine.getReplacementFallingBlockAt(sid, ent.getX(), ent.getY(), ent.getZ(), FilterEngine.TYPE_FALLING_BLOCKS);
             if (tid == null) {
                 tid = ReplacementEngine.getReplacementFallingBlock(sid);
             }
@@ -69,9 +94,9 @@ public class FallingBlockReplace {
         }
         Block shadow = ShadowBlocks.getShadow(bs.getBlock());
         if (shadow != null) {
-            // The shadow is a plain block without properties, so the default
-            // state is all the renderer needs.
-            st.movingBlockRenderState.blockState = shadow.getDefaultState();
+            // The shadow mirrors the vanilla properties; carry the falling
+            // block's values over so orientation etc. survives the swap.
+            st.movingBlockRenderState.blockState = copyShared(bs, shadow.getDefaultState());
             return;
         }
 
@@ -81,12 +106,19 @@ public class FallingBlockReplace {
         if (!com.wdylyh.config.RegionFacePacks.active()) {
             return;
         }
+        // Only a falling block whose id has actually edited region textures
+        // renders through its rface shadow (same index gate as ChunkMeshFilter).
+        if (!com.wdylyh.config.RegionFaceIndex.hasOverrides(com.wdylyh.config.RegionFaceIndex.BLOCKS, sid)) {
+            return;
+        }
         if (!com.wdylyh.config.RegionFaceEngine.isBlockFaceAt(sid, ent.getX(), ent.getY(), ent.getZ())) {
             return;
         }
         Block rfShadow = com.wdylyh.RegionFaceBlocks.getShadow(bs.getBlock());
         if (rfShadow != null) {
-            st.movingBlockRenderState.blockState = rfShadow.getDefaultState();
+            // Carry the vanilla state's property values onto the mirrored
+            // shadow properties (orientation etc. survives the swap).
+            st.movingBlockRenderState.blockState = copyShared(bs, rfShadow.getDefaultState());
         }
     }
 

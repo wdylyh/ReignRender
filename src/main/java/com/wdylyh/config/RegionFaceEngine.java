@@ -10,7 +10,8 @@ import net.minecraft.util.math.MathHelper;
 /**
  * Coordinate aware face modification ("区域面修改").
  *
- * The entries live in {@link RenderConfig.Filters#REGION_FACE_ENTRIES}, one per line,
+ * The entries are serialized from the condition system's face actions by
+ * {@link ConditionEngine#regionFaceLines()}, one per line,
  * in the same format as the coordinate filter entries:
  * <pre>
  *   x,y,z               a single block position
@@ -66,7 +67,7 @@ public class RegionFaceEngine {
             synchronized (RegionFaceEngine.class) {
                 if (dirty) {
                     List<Entry> parsed = new ArrayList<>();
-                    for (String line : RenderConfig.Filters.REGION_FACE_ENTRIES.getStrings()) {
+                    for (String line : ConditionEngine.regionFaceLines()) {
                         Entry entry = parse(line);
                         if (entry != null) {
                             parsed.add(entry);
@@ -194,46 +195,6 @@ public class RegionFaceEngine {
     /** True when a dropped / held item at the position uses its region-edited textures. */
     public static boolean isItemFaceAt(String itemId, double x, double y, double z) {
         return matchesAt(CAT_ITEM, itemId, x, y, z);
-    }
-
-    /**
-     * Bake-time precheck: true when the item id is explicitly attached to some
-     * region entry (an entry without ids cannot have an item shadow model
-     * baked, since that would mean baking one for every registered item).
-     */
-    public static boolean isItemListed(String itemId) {
-        if (itemId == null) {
-            return false;
-        }
-
-        rebuild();
-
-        for (Id i : listedIds()) {
-            if (i.item() && i.id().equals(itemId)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * All ids of the currently configured region entries (normalized), used by
-     * the resource pack generator to know which shadow resources to build.
-     */
-    public static List<Id> listedIds() {
-        rebuild();
-        List<Id> out = new ArrayList<>();
-
-        for (Entry e : entries) {
-            for (Id i : e.ids) {
-                if (!out.contains(i)) {
-                    out.add(i);
-                }
-            }
-        }
-
-        return out;
     }
 
     private static final class Entry {

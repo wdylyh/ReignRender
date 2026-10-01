@@ -8,12 +8,15 @@ import java.util.Map;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.AnvilBlock;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.DragonEggBlock;
 import net.minecraft.block.FallingBlock;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.state.StateManager;
+import net.minecraft.state.property.Property;
 import net.minecraft.util.Identifier;
 
 /**
@@ -55,12 +58,31 @@ public class ShadowBlocks {
         for (Block b : fallers) {
             Identifier id = ReignRenderMod.id("falling_" + Registries.BLOCK.getId(b).getPath());
             RegistryKey<Block> key = RegistryKey.of(RegistryKeys.BLOCK, id);
-            Block shadow = Registry.register(Registries.BLOCK, key,
-                    new Block(AbstractBlock.Settings.create().registryKey(key)));
+            Block shadow = Registry.register(Registries.BLOCK, key, createMirrorShadow(key, b));
             SHADOWS.put(b, shadow);
         }
 
         ReignRenderMod.LOGGER.info("[ReignRender] registered {} falling-block shadow blocks", SHADOWS.size());
+    }
+
+    /**
+     * Creates a shadow block that MIRRORS the vanilla block's state properties
+     * (facing, axis, snowy, ...). The generated shadow blockstate jsons are
+     * copied from the vanilla ones and keep their property-keyed variants, so
+     * a plain property-less shadow would reject them ("Unknown blockstate
+     * property" -> missing model -> unknown-texture cube). With the properties
+     * mirrored, the vanilla blockstate loads as-is and the render hooks can
+     * carry every property value over with copyShared.
+     */
+    static Block createMirrorShadow(RegistryKey<Block> key, Block vanilla) {
+        return new Block(AbstractBlock.Settings.create().registryKey(key)) {
+            @Override
+            protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+                for (Property<?> prop : vanilla.getDefaultState().getProperties()) {
+                    builder.add(prop);
+                }
+            }
+        };
     }
 
     /** The shadow block rendering the given vanilla block while falling, or null. */

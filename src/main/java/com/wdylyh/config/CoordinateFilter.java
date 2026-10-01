@@ -3,7 +3,6 @@ package com.wdylyh.config;
 import java.util.ArrayList;
 import java.util.List;
 
-import fi.dy.masa.malilib.config.value.BaseOptionListConfigValue;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
@@ -17,29 +16,28 @@ import net.minecraft.util.math.MathHelper;
 /**
  * Coordinate based render filter.
  *
- * The entries live in {@link RenderConfig.Filters#COORD_ENTRIES}, one per line, in one of
- * these formats (additional ids after a semicolon are optional):
+ * The entries are serialized from the condition system's hide/keep actions by
+ * {@link ConditionEngine#coordFilterLines()}, one per line, in one of these
+ * formats (additional ids after a semicolon are optional):
  * <pre>
  *   x,y,z               a single block position
  *   x1,y1,z1~x2,y2,z2   the box between two corners
  *   x,y,z;id;id         coordinate target with attached ids
  * </pre>
- * An attached id is matched against the registry that it resolves to (blocks,
- * entities, particles, fluids); ids that resolve to no registry are matched
- * against the text of name tags / player names. Blocks, fluids, block
- * entities and entities are matched by registry id, name tags and player
- * names by text, case-insensitively.
+ * A leading {@code "+"} marks a keep (whitelist) entry; unprefixed lines are
+ * hide (blacklist) entries. An attached id is matched against the registry
+ * that it resolves to (blocks, entities, particles, fluids); ids that resolve
+ * to no registry are matched against the text of name tags / player names.
+ * Blocks, fluids, block entities and entities are matched by registry id, name
+ * tags and player names by text, case-insensitively.
  *
- * The mode {@link RenderConfig.General#COORD_MODE} decides what happens with the objects at
- * a matched coordinate:
+ * The per-entry action decides what happens with the objects at a matched
+ * coordinate:
  * <ul>
- *   <li>OFF ("关闭"): every object at the coordinate is hidden, ignoring the
- *       attached ids entirely.</li>
- *   <li>WHITELIST ("白名单"): only the objects whose id is attached are kept
- *       visible, everything else is hidden. An entry without attached ids
- *       therefore hides everything at its coordinate.</li>
- *   <li>BLACKLIST ("黑名单"): only the objects whose id is attached are
- *       hidden.</li>
+ *   <li>hide ("禁止渲染"): the objects whose id is attached are hidden; an
+ *       entry without attached ids hides everything at its coordinate.</li>
+ *   <li>keep ("白名单"): only the objects whose id is attached are kept
+ *       visible, everything else is hidden.</li>
  * </ul>
  *
  * The filter is independent of the per-category master toggles: it applies
@@ -88,7 +86,7 @@ public class CoordinateFilter {
             synchronized (CoordinateFilter.class) {
                 if (dirty) {
                     List<Entry> parsed = new ArrayList<>();
-                    for (String line : RenderConfig.Filters.COORD_ENTRIES.getStrings()) {
+                    for (String line : ConditionEngine.coordFilterLines()) {
                         Entry entry = parse(line);
                         if (entry != null) {
                             parsed.add(entry);
@@ -106,11 +104,17 @@ public class CoordinateFilter {
     /**
      * Parses a config line into an entry, or returns null when the line is
      * not a valid coordinate target. Invalid lines are skipped silently so a
-     * typo in the config never breaks the game.
+     * typo in the config never breaks the game. A leading "+" marks the entry
+     * as a keep (whitelist) entry.
      */
     private static Entry parse(String line) {
         if (line == null) {
             return null;
+        }
+
+        boolean whitelist = line.startsWith("+");
+        if (whitelist) {
+            line = line.substring(1);
         }
 
         String[] parts = line.split(";", -1);
@@ -127,7 +131,7 @@ public class CoordinateFilter {
                 ids.add(id);
             }
         }
-        return new Entry(box[0], box[1], box[2], box[3], box[4], box[5], ids);
+        return new Entry(box[0], box[1], box[2], box[3], box[4], box[5], ids, whitelist);
     }
 
     /**
@@ -279,14 +283,14 @@ public class CoordinateFilter {
     }
 
     /**
-     * Returns true when the given position is inside a coordinate entry region
-     * and the mode is OFF ("关闭"). Used only for objects whose id cannot be
-     * resolved (some particles reach the renderer without a ParticleType): the
-     * OFF mode hides the whole region regardless of any attached ids, while the
-     * blacklist/whitelist modes always need an id to match against.
+     * Returns true when the given position is inside a hide entry that carries
+     * no ids (a whole-region hide). Used only for objects whose id cannot be
+     * resolved (some particles reach the renderer without a ParticleType): an
+     * id-less hide hides the whole region regardless of any ids, while every
+     * other entry always needs an id to match against.
      */
     public static boolean isRegionHiddenAt(double x, double y, double z) {
-        if (!active() || RenderConfig.General.COORD_MODE.getOptionValue() != RenderConfig.Filters.MODE_OFF) {
+        if (!active()) {
             return false;
         }
         rebuild();
@@ -297,7 +301,8 @@ public class CoordinateFilter {
         int by = MathHelper.floor(y);
         int bz = MathHelper.floor(z);
         for (Entry e : entries) {
-            if (bx >= e.x1 && bx <= e.x2 && by >= e.y1 && by <= e.y2 && bz >= e.z1 && bz <= e.z2) {
+            if (!e.whitelist && e.ids.isEmpty()
+                    && bx >= e.x1 && bx <= e.x2 && by >= e.y1 && by <= e.y2 && bz >= e.z1 && bz <= e.z2) {
                 return true;
             }
         }
@@ -324,21 +329,16 @@ public class CoordinateFilter {
 
     /**
      * Decides whether the object (category + id) at a matched coordinate is
-     * hidden. See the class comment for the mode semantics.
+     * hidden. See the class comment for the per-entry action semantics.
      */
     private static boolean hidden(Entry e, int cat, String id) {
-        BaseOptionListConfigValue mode = RenderConfig.General.COORD_MODE.getOptionValue();
-
-        // OFF ("关闭"): the whole region of the entry is hidden regardless of
-        // the attached ids.
-        if (mode == RenderConfig.Filters.MODE_OFF) {
-            return true;
+        if (e.whitelist) {
+            // keep: only the attached ids stay visible.
+            return !inList(e, cat, id);
         }
-
-        boolean inList = inList(e, cat, id);
-        // WHITELIST hides ids absent from the entry, BLACKLIST hides ids
-        // present in it.
-        return (mode == RenderConfig.Filters.MODE_WHITELIST) != inList;
+        // hide: the attached ids are hidden; an entry without ids hides
+        // everything at its coordinate.
+        return e.ids.isEmpty() || inList(e, cat, id);
     }
 
     private static boolean inList(Entry e, int cat, String id) {
@@ -382,8 +382,10 @@ public class CoordinateFilter {
     private static class Entry {
         final int x1, y1, z1, x2, y2, z2;
         final List<Id> ids;
+        /** True for keep ("白名单") entries: only the ids stay visible. */
+        final boolean whitelist;
 
-        Entry(int x1, int y1, int z1, int x2, int y2, int z2, List<Id> ids) {
+        Entry(int x1, int y1, int z1, int x2, int y2, int z2, List<Id> ids, boolean whitelist) {
             this.x1 = x1;
             this.y1 = y1;
             this.z1 = z1;
@@ -391,6 +393,7 @@ public class CoordinateFilter {
             this.y2 = y2;
             this.z2 = z2;
             this.ids = ids;
+            this.whitelist = whitelist;
         }
     }
 

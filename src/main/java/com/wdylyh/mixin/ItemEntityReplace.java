@@ -63,7 +63,10 @@ public class ItemEntityReplace {
     private ItemStack getStack(ItemEntity ent) {
         ItemStack stack = ent.getStack();
 
-        if (!ReplacementEngine.isReplaceEnabled() || stack.isEmpty()) {
+        // No master-switch gate: the coordinate rules below are gated by the
+        // coordinate replace toggle (global switch OFF), the global fallback
+        // checks the master switch internally.
+        if (stack.isEmpty()) {
             return stack;
         }
         // The reveal hotkey skips the replacement (shows the original drop),
@@ -79,7 +82,7 @@ public class ItemEntityReplace {
 
         // Coordinate aware rules win over the global list; the drop's current
         // position decides.
-        String tId = ReplacementEngine.getReplacementItemAt(src, ent.getX(), ent.getY(), ent.getZ());
+        String tId = ReplacementEngine.getReplacementItemAt(src, ent.getX(), ent.getY(), ent.getZ(), FilterEngine.TYPE_ITEM_ENTITIES);
         if (tId == null) {
             tId = ReplacementEngine.getReplacementItem(src);
         }

@@ -13,18 +13,18 @@ import fi.dy.masa.malilib.util.StringUtils;
 import net.minecraft.client.gui.Click;
 
 /**
- * Full screen coordinate replacement list editor, reached from the coordinate
- * replacement config button in both input modes (see {@link CoordReplaceButton}).
- * Shows every entry of the backing {@link RenderConfig.Filters#COORD_REPLACE_ENTRIES} list
- * with a delete button each, plus an add button — the same layout and
- * interaction as {@link CoordEntryListScreen} for the coordinate filter entries.
+ * Full screen condition list editor, reached from the condition entries config
+ * button on the conditions tab. Shows every entry of the backing
+ * {@link RenderConfig.Conditions#CONDITION_ENTRIES} list with a delete button
+ * each, plus an add button.
  *
  * Clicking the body of a row re-opens it in the entry editor
- * ({@link CoordReplaceEditor}) so the coordinate target and the "source=target"
- * rules can be changed in place; clicking the delete button removes the whole
- * entry. Adding opens the same editor with the fields empty.
+ * ({@link ConditionEntryEditor}) so the region, the distance / count limits,
+ * the attached ids and the actions can be changed in place; clicking the
+ * delete button removes the whole entry. Adding opens the same editor with
+ * the fields empty.
  */
-public class CoordReplaceListScreen extends GuiBase
+public class ConditionListScreen extends GuiBase
 {
     public static final int LH = 20;
     public static final int LTOP = 60;
@@ -32,7 +32,7 @@ public class CoordReplaceListScreen extends GuiBase
 
     private int scrollOffset;
 
-    public CoordReplaceListScreen()
+    public ConditionListScreen()
     {
     }
 
@@ -40,8 +40,11 @@ public class CoordReplaceListScreen extends GuiBase
     public void initGui()
     {
         super.initGui();
+        // So the config GUI behind this screen (Esc / done) opens on the
+        // conditions tab
+        ConfigScreen.setTab(ConfigScreen.GTab.CONDITIONS);
         this.setParent(new ConfigScreen());
-        this.setTitle(StringUtils.translate("reignrender.gui.coordRep.title"));
+        this.setTitle(StringUtils.translate("reignrender.gui.condition.title"));
         this.scrollOffset = 0;
         this.rebuild();
     }
@@ -68,19 +71,19 @@ public class CoordReplaceListScreen extends GuiBase
     {
         this.clearElements();
 
-        this.addButton(new ButtonGeneric(20, 26, 100, false, "reignrender.gui.coordRep.add"),
+        this.addButton(new ButtonGeneric(20, 26, 100, false, "reignrender.gui.condition.add"),
                        (b, m) -> this.startAdd());
         this.addButton(new ButtonGeneric(this.width - 10, 26, 120, true, "reignrender.gui.filter.done"),
                        (b, m) -> GuiBase.openGui(new ConfigScreen()));
 
-        List<String> entries = RenderConfig.Filters.COORD_REPLACE_ENTRIES.getStrings();
+        List<String> entries = RenderConfig.Conditions.CONDITION_ENTRIES.getStrings();
         int vis = Math.max(1, this.listH() / LH + 1);
         this.scrollOffset = Math.min(this.scrollOffset, Math.max(0, entries.size() - vis) * LH);
 
         if (entries.isEmpty())
         {
             this.addLabel(20, LTOP + 8, this.width - 40, 10,
-                    0x80FFFFFF, StringUtils.translate("reignrender.gui.coordRep.empty"));
+                    0x80FFFFFF, StringUtils.translate("reignrender.gui.condition.empty"));
             return;
         }
 
@@ -95,13 +98,13 @@ public class CoordReplaceListScreen extends GuiBase
     /** Opens the entry editor with empty fields to append a new entry. */
     private void startAdd()
     {
-        GuiBase.openGui(new CoordReplaceEditor(null, this));
+        GuiBase.openGui(new ConditionEntryEditor(null, this));
     }
 
     /** Opens the entry editor pre-filled with the given entry. */
     private void editRow(int index)
     {
-        GuiBase.openGui(new CoordReplaceEditor(index, this));
+        GuiBase.openGui(new ConditionEntryEditor(index, this));
     }
 
     private class Row extends WidgetBase
@@ -111,7 +114,7 @@ public class CoordReplaceListScreen extends GuiBase
 
         Row(int index, String entry, int x, int y)
         {
-            super(x, y, CoordReplaceListScreen.this.width - 40, LH);
+            super(x, y, ConditionListScreen.this.width - 40, LH);
             this.index = index;
             this.entry = entry;
         }
@@ -144,19 +147,19 @@ public class CoordReplaceListScreen extends GuiBase
             {
                 if ((int) c.x() >= this.x + this.width - DWB)
                 {
-                    List<String> cur = new ArrayList<>(RenderConfig.Filters.COORD_REPLACE_ENTRIES.getStrings());
+                    List<String> cur = new ArrayList<>(RenderConfig.Conditions.CONDITION_ENTRIES.getStrings());
 
                     if (this.index >= 0 && this.index < cur.size())
                     {
                         cur.remove(this.index);
-                        RenderConfig.Filters.COORD_REPLACE_ENTRIES.setStrings(cur);
+                        RenderConfig.Conditions.CONDITION_ENTRIES.setStrings(cur);
                     }
 
-                    CoordReplaceListScreen.this.rebuild();
+                    ConditionListScreen.this.rebuild();
                 }
                 else
                 {
-                    CoordReplaceListScreen.this.editRow(this.index);
+                    ConditionListScreen.this.editRow(this.index);
                 }
 
                 return true;

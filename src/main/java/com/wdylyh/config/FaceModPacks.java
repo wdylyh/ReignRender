@@ -973,7 +973,12 @@ public class    FaceModPacks {
         // too late in the pipeline to feed freshly written sprites into it.
         ensureShadowItemResources();
 
-        enablePackAndReload();
+        // Saving an edit must never force-enable the pack while the master
+        // switch is off: the pack overrides vanilla texture paths globally,
+        // so an enabled pack with a disabled switch would change the whole
+        // world. With the switch off the edit is only written to disk and
+        // applies as soon as the switch is turned back on.
+        applyEnabled(RenderConfig.General.ENABLE_FACE_MOD.getBooleanValue());
     }
 
     /**
@@ -1010,6 +1015,16 @@ public class    FaceModPacks {
      * existing pack (nothing edited yet) does nothing.
      */
     public static void applyEnabled(boolean enabled) {
+        applyEnabled(enabled, true);
+    }
+
+    /**
+     * Applies the pack state. With {@code allowReload} false (the startup
+     * bootstrap) a state change still happens, but the reload is skipped —
+     * the game's own initial resource load picks the new pack state up. A run
+     * where the pack is already in the desired state does nothing at all.
+     */
+    public static void applyEnabled(boolean enabled, boolean allowReload) {
         MinecraftClient mc = MinecraftClient.getInstance();
 
         if (mc == null) {
@@ -1019,7 +1034,10 @@ public class    FaceModPacks {
         if (!enabled) {
             if (isEnabled()) {
                 disablePack();
-                reloadResources();
+
+                if (allowReload) {
+                    reloadResources();
+                }
             }
 
             return;
@@ -1032,7 +1050,14 @@ public class    FaceModPacks {
         // the pack files during the reload.
         ensurePack();
         ensureShadowItemResources();
-        enablePackAndReload();
+
+        if (allowReload) {
+            enablePackAndReload();
+        } else {
+            // Startup bootstrap: only make sure the pack is among the enabled
+            // packs (persisted) — the game's own initial resource load applies it.
+            enablePack();
+        }
     }
 
     /**
@@ -1077,6 +1102,12 @@ public class    FaceModPacks {
      * changed on disk; saving an edit always reloads.
      */
     private static void enablePackAndReload() {
+        enablePack();
+        reloadResources();
+    }
+
+    /** Scans the resource pack folders, enables the pack and persists the enabled list (no reload). */
+    private static void enablePack() {
         MinecraftClient mc = MinecraftClient.getInstance();
 
         if (mc == null) {
@@ -1098,8 +1129,6 @@ public class    FaceModPacks {
             // Persist the enabled state so the pack stays on across restarts
             mc.options.refreshResourcePacks(manager);
         }
-
-        reloadResources();
     }
 
     /** Removes the pack from the enabled list and persists the change. */

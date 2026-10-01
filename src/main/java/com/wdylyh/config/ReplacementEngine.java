@@ -148,9 +148,10 @@ public class ReplacementEngine {
 
                     // Coordinate aware entries: parse the coordinates + rules
                     // and publish the immutable snapshot together with the
-                    // per-category maps above.
+                    // per-category maps above. The lines come from the
+                    // condition system's replace actions.
                     List<CoordEntry> coordList = new ArrayList<>();
-                    for (String line : RenderConfig.Filters.COORD_REPLACE_ENTRIES.getStrings()) {
+                    for (String line : ConditionEngine.coordReplaceLines()) {
                         CoordEntry coordEntry = parseCoord(line);
                         if (coordEntry != null) {
                             coordList.add(coordEntry);
@@ -237,11 +238,22 @@ public class ReplacementEngine {
             return null;
         }
 
-        Map<String, String> rules = new HashMap<>();
+        Map<String, Map<String, String>> rules = new HashMap<>();
         for (int i = 1; i < parts.length; i++) {
             String rule = parts[i];
             if (rule == null) {
                 continue;
+            }
+            // Optional category prefix: "blocks:stone=glass" pins the rule to
+            // one render category, "stone=glass" applies to every category.
+            String cat = null;
+            int colon = rule.indexOf(':');
+            if (colon > 0) {
+                String maybe = rule.substring(0, colon).trim().toLowerCase(Locale.ROOT);
+                if (COORD_REPLACE_CATEGORIES.contains(maybe)) {
+                    cat = maybe;
+                    rule = rule.substring(colon + 1);
+                }
             }
             int eq = rule.indexOf('=');
             if (eq <= 0 || eq >= rule.length() - 1) {
@@ -250,7 +262,8 @@ public class ReplacementEngine {
             String source = rule.substring(0, eq).trim();
             String target = rule.substring(eq + 1).trim();
             if (!source.isEmpty() && !target.isEmpty()) {
-                rules.put(source.toLowerCase(Locale.ROOT), target);
+                rules.computeIfAbsent(cat, k -> new HashMap<>())
+                        .put(source.toLowerCase(Locale.ROOT), target);
             }
         }
         if (rules.isEmpty()) {
@@ -289,26 +302,43 @@ public class ReplacementEngine {
             return null;
         }
         rebuild();
-        return hitRule(map, key);
+        return hitIn(map, key);
     }
 
     /**
-     * Looks up a rule by exact id. The game always queries with the fully
-     * namespaced id ("minecraft:grass_block"), while players may write the
-     * bare id ("grass_block") in the lists, so an exact miss retries with
-     * the "minecraft:" prefix stripped. Bare keys never match ids of other
-     * namespaces, keeping custom mod ids unambiguous.
+     * Looks up a rule by exact id within the query's category first, then in
+     * the "no prefix" bucket (which applies to every category). The game
+     * always queries with the fully namespaced id ("minecraft:grass_block"),
+     * while players may write the bare id ("grass_block") in the lists, so an
+     * exact miss retries with the "minecraft:" prefix stripped. Bare keys
+     * never match ids of other namespaces, keeping custom mod ids unambiguous.
      */
-    private static String hitRule(Map<String, String> rules, String key) {
+    private static String hitRule(Map<String, Map<String, String>> rules, String category, String key) {
         if (key == null) {
             return null;
         }
-        String value = rules.get(key);
+        // Parsers store the category prefix lowercased (COORD_REPLACE_CATEGORIES
+        // is all lowercase), while the mixins query with the camel-case
+        // FilterEngine.TYPE_* constants: normalize before the map lookup.
+        String cat = category == null ? null : category.toLowerCase(Locale.ROOT);
+        String value = hitIn(rules.get(cat), key);
+        if (value != null) {
+            return value;
+        }
+        return hitIn(rules.get(null), key);
+    }
+
+    /** Single-bucket variant of {@link #hitRule}: exact match, then bare-id retry. */
+    private static String hitIn(Map<String, String> bucket, String key) {
+        if (bucket == null) {
+            return null;
+        }
+        String value = bucket.get(key);
         if (value != null) {
             return value;
         }
         String bare = key.startsWith("minecraft:") ? key.substring("minecraft:".length()) : null;
-        return (bare == null) ? null : rules.get(bare);
+        return (bare == null) ? null : bucket.get(bare);
     }
 
     // ==================== 分类查询方法 (Per-category queries) ====================
@@ -322,6 +352,18 @@ public class ReplacementEngine {
     public static int particleRuleCount() {
         rebuild();
         return particle_Replace.size();
+    }
+
+    /** Number of configured block replace rules (for diagnostics). */
+    public static int blockRuleCount() {
+        rebuild();
+        return block_Replace.size();
+    }
+
+    /** Number of parsed coordinate aware replace entries (for diagnostics). */
+    public static int coordEntryCount() {
+        rebuild();
+        return coordinate_Entries.length;
     }
 
     /** Returns the replacement block id for the given block id, or null. */
@@ -394,63 +436,55 @@ public class ReplacementEngine {
     // caller falls back to its global per-category list.
 
     /** Returns the coordinate replacement block id for the source at (x, y, z), or null. */
-    public static String getReplacementBlockAt(String sourceId, double x, double y, double z) {
-        return coordinate_Replace_Id(sourceId, x, y, z);
+    // Each query passes its render category (FilterEngine.TYPE_*), so a rule
+    // prefixed with a category only answers that category's queries.
+
+    public static String getReplacementBlockAt(String sourceId, double x, double y, double z, String category) {
+        return coordinate_Replace_Id(sourceId, x, y, z, category);
     }
 
-    /** Returns the coordinate replacement fluid id for the source at (x, y, z), or null. */
-    public static String getReplacementFluidAt(String sourceId, double x, double y, double z) {
-        return coordinate_Replace_Id(sourceId, x, y, z);
+    public static String getReplacementFluidAt(String sourceId, double x, double y, double z, String category) {
+        return coordinate_Replace_Id(sourceId, x, y, z, category);
     }
 
-    /** Returns the coordinate replacement entity id for the source at (x, y, z), or null. */
-    public static String getReplacementEntityAt(String sourceId, double x, double y, double z) {
-        return coordinate_Replace_Id(sourceId, x, y, z);
+    public static String getReplacementEntityAt(String sourceId, double x, double y, double z, String category) {
+        return coordinate_Replace_Id(sourceId, x, y, z, category);
     }
 
-    /** Returns the coordinate replacement particle id for the source at (x, y, z), or null. */
-    public static String getReplacementParticleAt(String sourceId, double x, double y, double z) {
-        return coordinate_Replace_Id(sourceId, x, y, z);
+    public static String getReplacementParticleAt(String sourceId, double x, double y, double z, String category) {
+        return coordinate_Replace_Id(sourceId, x, y, z, category);
     }
 
-    /** Returns the coordinate replacement block entity id for the source at (x, y, z), or null. */
-    public static String getReplacementBlockEntityAt(String sourceId, double x, double y, double z) {
-        return coordinate_Replace_Id(sourceId, x, y, z);
+    public static String getReplacementBlockEntityAt(String sourceId, double x, double y, double z, String category) {
+        return coordinate_Replace_Id(sourceId, x, y, z, category);
     }
 
-    /** Returns the coordinate replacement falling block id at (x, y, z), or null. */
-    public static String getReplacementFallingBlockAt(String sourceId, double x, double y, double z) {
-        return coordinate_Replace_Id(sourceId, x, y, z);
+    public static String getReplacementFallingBlockAt(String sourceId, double x, double y, double z, String category) {
+        return coordinate_Replace_Id(sourceId, x, y, z, category);
     }
 
-    /** Returns the coordinate replacement item id for the source at (x, y, z), or null. */
-    public static String getReplacementItemAt(String sourceId, double x, double y, double z) {
-        return coordinate_Replace_Id(sourceId, x, y, z);
+    public static String getReplacementItemAt(String sourceId, double x, double y, double z, String category) {
+        return coordinate_Replace_Id(sourceId, x, y, z, category);
     }
 
-    /** Returns the coordinate replacement held item id for the source at (x, y, z), or null. */
-    public static String getReplacementHeldItemAt(String sourceId, double x, double y, double z) {
-        return coordinate_Replace_Id(sourceId, x, y, z);
+    public static String getReplacementHeldItemAt(String sourceId, double x, double y, double z, String category) {
+        return coordinate_Replace_Id(sourceId, x, y, z, category);
     }
 
-    /** Returns the coordinate replacement fog identity at (x, y, z), or null. */
-    public static String getReplacementFogAt(String sourceId, double x, double y, double z) {
-        return coordinate_Replace_Id(sourceId, x, y, z);
+    public static String getReplacementFogAt(String sourceId, double x, double y, double z, String category) {
+        return coordinate_Replace_Id(sourceId, x, y, z, category);
     }
 
-    /** Returns the coordinate replacement armor item id at (x, y, z), or null. */
-    public static String getReplacementArmorAt(String sourceId, double x, double y, double z) {
-        return coordinate_Replace_Id(sourceId, x, y, z);
+    public static String getReplacementArmorAt(String sourceId, double x, double y, double z, String category) {
+        return coordinate_Replace_Id(sourceId, x, y, z, category);
     }
 
-    /** Returns the coordinate replacement name tag text for the name at (x, y, z), or null. */
-    public static String getReplacementNameTagAt(String sourceName, double x, double y, double z) {
-        return coordinate_Replace_Text(sourceName, x, y, z);
+    public static String getReplacementNameTagAt(String sourceName, double x, double y, double z, String category) {
+        return coordinate_Replace_Text(sourceName, x, y, z, category);
     }
 
-    /** Returns the coordinate replacement player name text at (x, y, z), or null. */
-    public static String getReplacementPlayerNameAt(String sourceName, double x, double y, double z) {
-        return coordinate_Replace_Text(sourceName, x, y, z);
+    public static String getReplacementPlayerNameAt(String sourceName, double x, double y, double z, String category) {
+        return coordinate_Replace_Text(sourceName, x, y, z, category);
     }
 
     /**
@@ -459,7 +493,7 @@ public class ReplacementEngine {
      * position or the first containing region has no rule for the key (the
      * caller then falls back to the global list).
      */
-    private static String coordinate_Replace_Id(String key, double x, double y, double z) {
+    private static String coordinate_Replace_Id(String key, double x, double y, double z, String category) {
         if (!coordReplaceActive() || key == null) {
             return null;
         }
@@ -472,7 +506,7 @@ public class ReplacementEngine {
         int bz = MathHelper.floor(z);
         for (CoordEntry e : coordinate_Entries) {
             if (bx >= e.x1 && bx <= e.x2 && by >= e.y1 && by <= e.y2 && bz >= e.z1 && bz <= e.z2) {
-                return hitRule(e.rules, key);
+                return hitRule(e.rules, category, key);
             }
         }
         return null;
@@ -483,10 +517,14 @@ public class ReplacementEngine {
      * the first region that contains (x, y, z). Same return contract as
      * {@link #coordinate_Replace_Id}
      */
-    private static String coordinate_Replace_Text(String key, double x, double y, double z) {
+    private static String coordinate_Replace_Text(String key, double x, double y, double z, String category) {
         if (!coordReplaceActive() || key == null) {
             return null;
         }
+        // parseCoord stores the category keys lowercased ("nametags"), so the
+        // camel-case TYPE_* constants ("nameTags") must be lowercased here too,
+        // exactly like hitRule does for the id path.
+        String cat = category != null ? category.toLowerCase(Locale.ROOT) : null;
         rebuild();
         if (coordinate_Entries.length == 0) {
             return null;
@@ -496,12 +534,25 @@ public class ReplacementEngine {
         int bz = MathHelper.floor(z);
         for (CoordEntry e : coordinate_Entries) {
             if (bx >= e.x1 && bx <= e.x2 && by >= e.y1 && by <= e.y2 && bz >= e.z1 && bz <= e.z2) {
-                for (Map.Entry<String, String> rule : e.rules.entrySet()) {
-                    if (rule.getKey().equalsIgnoreCase(key)) {
-                        return rule.getValue();
-                    }
-                }
-                return null;
+                String value = hitText(e.rules.get(cat), key);
+                return value != null ? value : hitText(e.rules.get(null), key);
+            }
+        }
+        return null;
+    }
+
+    /** Case-insensitive text match within one category bucket, or null. */
+    private static String hitText(Map<String, String> bucket, String key) {
+        if (bucket == null) {
+            return null;
+        }
+        // equalsIgnoreCase is allocation-free, unlike key.toLowerCase(...) which
+        // would allocate a new String for every rendered name tag / player name
+        // on every frame. The text buckets only hold a handful of rules, so the
+        // linear scan is cheap.
+        for (Map.Entry<String, String> rule : bucket.entrySet()) {
+            if (rule.getKey().equalsIgnoreCase(key)) {
+                return rule.getValue();
             }
         }
         return null;
@@ -594,12 +645,28 @@ public class ReplacementEngine {
 
     // ==================== 数据 (Data) ====================
 
+    /**
+     * Registry ids are shared between render categories (a falling anvil, the
+     * landed anvil block and the dropped anvil item all resolve to
+     * "minecraft:anvil"), so a coordinate rule may pin itself to one category
+     * with a prefix — {@code replace:fallingBlocks:anvil=gold} only affects
+     * falling blocks. The category keys mirror {@link FilterEngine#TYPE_*}
+     * lowercased: every parser compares the prefix case-insensitively via
+     * {@code toLowerCase}, and {@link #hitRule} lowercases the queried
+     * category, so the all-lowercase keys here are the one canonical form.
+     * Rules without a prefix apply to every category.
+     */
+    public static final java.util.Set<String> COORD_REPLACE_CATEGORIES = java.util.Set.of(
+            "blocks", "entities", "particles", "fluids", "blockentities", "fallingblocks",
+            "itementities", "helditems", "armor", "fog", "nametags", "playernames");
+
     /** One parsed coordinate replacement region plus its "source=target" rules. */
     private static class CoordEntry {
         final int x1, y1, z1, x2, y2, z2;
-        final Map<String, String> rules;
+        /** Rules keyed by category (null = the "no prefix" bucket, valid for every category). */
+        final Map<String, Map<String, String>> rules;
 
-        CoordEntry(int x1, int y1, int z1, int x2, int y2, int z2, Map<String, String> rules) {
+        CoordEntry(int x1, int y1, int z1, int x2, int y2, int z2, Map<String, Map<String, String>> rules) {
             this.x1 = x1;
             this.y1 = y1;
             this.z1 = z1;

@@ -74,11 +74,14 @@ public class FaceModItemModels implements ModelLoadingPlugin {
             ctx.addModel(key, SimpleUnbakedExtraModel.blockStateModel(mid));
         }
 
-        // Region face-mod item shadow models: generated from the current
-        // region entries and baked as extra models the same way.
+        // Region face-mod item shadow models: generated for every item id with
+        // region edits (index-driven) and baked as extra models the same way.
         com.wdylyh.config.RegionFacePacks.ensureResources();
 
+        java.util.Set<Identifier> regionAvailable = new java.util.HashSet<>();
+
         for (Identifier mid : com.wdylyh.config.RegionFacePacks.regionItemModelIds()) {
+            regionAvailable.add(mid);
             ExtraModelKey<BlockStateModel> key = REGION_KEYS.computeIfAbsent(mid, k -> ExtraModelKey.create(k::toString));
             ctx.addModel(key, SimpleUnbakedExtraModel.blockStateModel(mid));
         }
@@ -100,11 +103,12 @@ public class FaceModItemModels implements ModelLoadingPlugin {
             GeometryBakedModel dropped = globalOn && available.contains(FaceModPacks.shadowModelId(sid, "dropped"))
                     ? bakeShadow(baker, sid, "dropped") : null;
 
-            // Region face-mod item shadow: baked only for explicitly listed
-            // ids; at runtime the region lookup and the carrier position
-            // (published by the render-path mixins) decide.
+            // Region face-mod item shadow: wrapped whenever the item id
+            // carries region edits (available shadow model); at runtime the
+            // region lookup and the carrier position (published by the
+            // render-path mixins) decide where the region model renders.
             GeometryBakedModel region = com.wdylyh.config.RegionFacePacks.active()
-                    && com.wdylyh.config.RegionFaceEngine.isItemListed(sid)
+                    && regionAvailable.contains(com.wdylyh.config.RegionFacePacks.regionItemModelId(sid))
                     ? bakeRegion(baker, sid) : null;
 
             if (held == null && dropped == null && region == null) {

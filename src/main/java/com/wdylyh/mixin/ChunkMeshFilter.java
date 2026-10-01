@@ -2,6 +2,7 @@ package com.wdylyh.mixin;
 
 import com.mojang.blaze3d.systems.VertexSorter;
 import com.wdylyh.config.RenderConfig;
+import com.wdylyh.config.ConditionEngine;
 import com.wdylyh.config.CoordinateFilter;
 import com.wdylyh.config.FilterEngine;
 import com.wdylyh.config.ReplacementEngine;
@@ -21,6 +22,8 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import java.util.List;
 import net.minecraft.world.BlockRenderView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -31,6 +34,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class ChunkMeshFilter {
 
     private static final BlockState AIR = Blocks.AIR.getDefaultState();
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChunkMeshFilter.class);
+
+    // One-shot guard for the block replace diagnostic log (see
+    // replaceBlockState): true once the first bake with the master switch on
+    // has logged the replacement state.
+    private static boolean REPLACE_DIAG_LOGGED = false;
 
     // Per-thread per-section constants, captured once at the start of every
     // build() call instead of once per block:
@@ -65,6 +75,9 @@ public class ChunkMeshFilter {
         st[1] = FilterEngine.hotkey_Behavior(FilterEngine.TYPE_BLOCKS, kd);
         st[2] = ReplacementEngine.isReplaceEnabled() ? 1 : 0;
         st[4] = FilterEngine.hotkey_Behavior(FilterEngine.TYPE_BLOCK_ENTITIES, kd);
+        // The condition system's count budget is per section on the baking
+        // path (a section is baked once and reused across frames).
+        ConditionEngine.beginSection();
     }
 
     // Replaces the block state of filtered blocks with air right where the
@@ -105,6 +118,20 @@ public class ChunkMeshFilter {
 
         // bh == NORMAL (release mode, hotkey not held): the filters and the
         // replacement all apply.
+        // Condition system distance/count limits: blocks of an id whose dist
+        // entry is exceeded (block position vs. the camera position sampled
+        // per frame on the render thread) or whose per-section count budget
+        // is used up are hidden like the block filter. Independent of the
+        // block filter master toggle; evaluated once per baked block, so a
+        // later change only applies after the chunk rebuilds (the same
+        // baked-data caveat as every block path filter).
+        String blockId = FilterEngine.getBlockId(st.getBlock());
+        if (blockId != null &&
+                (ConditionEngine.isBlockDistanceExceeded(blockId, p.getX(), p.getY(), p.getZ())
+                 || ConditionEngine.isBlockCountExceeded(blockId, p.getX(), p.getY(), p.getZ()))) {
+            return hidden(st, ss);
+        }
+
         // Block-category hiding exempts block-entity-managed blocks (signs,
         // banners, chests, shulker boxes, ...): they have no static chunk model
         // at all - their whole look is drawn by the block entity renderer - so
@@ -137,7 +164,13 @@ public class ChunkMeshFilter {
                 && !FilterEngine.isBlockManagedByBlockEntityFilter(st.getBlock())
                 && st.getFluidState().isEmpty()) {
             String bid = FilterEngine.getBlockId(st.getBlock());
-            if (bid != null && com.wdylyh.config.RegionFaceEngine.isBlockFaceAt(bid, p.getX(), p.getY(), p.getZ())) {
+            // The index gate is mandatory: only a block id with actually edited
+            // region textures renders through its shadow, so a region entry
+            // without ids (or with unedited ids) keeps the vanilla block
+            // instead of swapping to a shadow block that has no resources.
+            if (bid != null
+                    && com.wdylyh.config.RegionFaceIndex.hasOverrides(com.wdylyh.config.RegionFaceIndex.BLOCKS, bid)
+                    && com.wdylyh.config.RegionFaceEngine.isBlockFaceAt(bid, p.getX(), p.getY(), p.getZ())) {
                 Block sh = com.wdylyh.RegionFaceBlocks.getShadow(st.getBlock());
                 if (sh != null) {
                     return copyShared(st, sh.getDefaultState());
@@ -154,22 +187,46 @@ public class ChunkMeshFilter {
         // ThreadLocal lookup per block and no config read. It only runs in
         // NORMAL state (enable mode suppresses it via the INACTIVE early
         // return above).
-        if (ss[2] != 0) {
-            // Coordinate aware rules win over the global list: a rule inside
-            // the region the block sits in (position p) replaces directly,
-            // anything else falls back to the global per-category list.
-            String sourceId = FilterEngine.getBlockId(st.getBlock());
-            String tid = ReplacementEngine.getReplacementBlockAt(sourceId, p.getX(), p.getY(), p.getZ());
-            if (tid == null) {
-                tid = ReplacementEngine.getReplacementBlock(sourceId);
+        if (ss[2] != 0 && !REPLACE_DIAG_LOGGED) {
+            REPLACE_DIAG_LOGGED = true;
+            LOGGER.info("[ReignRender] block replace ready: enabled={}, globalRules={}, coordEntries={}",
+                    ReplacementEngine.isReplaceEnabled(),
+                    ReplacementEngine.blockRuleCount(),
+                    ReplacementEngine.coordEntryCount());
+        }
+
+        // Region/condition replacement comes first and is gated internally by
+        // the coordinate replace toggle (which requires the global master
+        // switch to be OFF — mutual exclusion). It must therefore NOT sit
+        // behind the ss[2] master-switch gate: the two conditions contradict
+        // and the region rules could never apply.
+        String sourceId = FilterEngine.getBlockId(st.getBlock());
+        String regionTid = ReplacementEngine.getReplacementBlockAt(sourceId, p.getX(), p.getY(), p.getZ(), FilterEngine.TYPE_BLOCKS);
+        if (regionTid != null) {
+            Block t = ReplacementEngine.getBlockTarget(regionTid);
+            if (t != null && t != st.getBlock()) {
+                // Pure rendering swap: the mesh is built from the target
+                // block's model, but every property the two states share
+                // (facing, waterlogged, lit, half, ...) keeps the source
+                // block's value. The world data is never modified.
+                return copyShared(st, t.getDefaultState());
             }
+        }
+
+        // Universal block replacement: while the master replace switch is on
+        // and the source block id has a rule, the chunk mesh is built from the
+        // target block's default state instead of the original one. This runs
+        // after every hide filter so hidden blocks (air) stay hidden and the
+        // reveal hotkey keeps showing the real world. The master switch state
+        // is cached per section, so a disabled replace system costs one
+        // ThreadLocal lookup per block and no config read. It only runs in
+        // NORMAL state (enable mode suppresses it via the INACTIVE early
+        // return above).
+        if (ss[2] != 0) {
+            String tid = ReplacementEngine.getReplacementBlock(sourceId);
             if (tid != null) {
                 Block t = ReplacementEngine.getBlockTarget(tid);
                 if (t != null && t != st.getBlock()) {
-                    // Pure rendering swap: the mesh is built from the target
-                    // block's model, but every property the two states share
-                    // (facing, waterlogged, lit, half, ...) keeps the source
-                    // block's value. The world data is never modified.
                     return copyShared(st, t.getDefaultState());
                 }
             }

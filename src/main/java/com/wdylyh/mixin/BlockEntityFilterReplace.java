@@ -1,6 +1,7 @@
 package com.wdylyh.mixin;
 
 import com.wdylyh.config.RenderConfig;
+import com.wdylyh.config.ConditionEngine;
 import com.wdylyh.config.CoordinateFilter;
 import com.wdylyh.config.FilterEngine;
 import com.wdylyh.config.ReplacementEngine;
@@ -68,6 +69,19 @@ public class BlockEntityFilterReplace {
             // is matched by the block id of its backing block at its absolute pos.
             if (CoordinateFilter.isBlockEntityHidden(be)) {
                 cbr.cancel();
+                return;
+            }
+
+            // Condition system distance/count limits: the block entity is
+            // matched by its backing block id at its own position, with the
+            // per-frame count budget (same as entities/particles). The
+            // distance check uses the camera position sampled once per frame.
+            net.minecraft.util.math.BlockPos bPos = be.getPos();
+            String beId = FilterEngine.getBlockId(be.getCachedState().getBlock());
+            if (ConditionEngine.isCountExceeded(beId, bPos.getX(), bPos.getY(), bPos.getZ())
+                    || ConditionEngine.isBlockDistanceExceeded(beId,
+                            bPos.getX(), bPos.getY(), bPos.getZ())) {
+                cbr.cancel();
             }
         }
     }
@@ -81,11 +95,12 @@ public class BlockEntityFilterReplace {
     // Holding the reveal key skips the swap, showing the original.
     @ModifyVariable(method = "getRenderState", at = @At("HEAD"), argsOnly = true, index = 1)
     private BlockEntity repBe(BlockEntity be) {
-        if (!ReplacementEngine.isReplaceEnabled() || be == null) {
+        // No master-switch gate: the coordinate rules below are gated by the
+        // coordinate replace toggle (global switch OFF), the global fallback
+        // checks the master switch internally.
+        if (be == null) {
             return be;
         }
-        // The reveal key state is only queried when replacement is enabled,
-        // so the native GLFW lookup is skipped for the common no-replace case.
         boolean kd = FilterEngine.revealDown();
         if (FilterEngine.isReplaceBlocked(FilterEngine.TYPE_BLOCK_ENTITIES, kd)) {
             return be;
@@ -94,7 +109,7 @@ public class BlockEntityFilterReplace {
         // Coordinate aware rules win over the global list; the block entity's
         // own position decides.
         net.minecraft.util.math.BlockPos pos = be.getPos();
-        String tId = ReplacementEngine.getReplacementBlockEntityAt(sId, pos.getX(), pos.getY(), pos.getZ());
+        String tId = ReplacementEngine.getReplacementBlockEntityAt(sId, pos.getX(), pos.getY(), pos.getZ(), FilterEngine.TYPE_BLOCK_ENTITIES);
         if (tId == null) {
             tId = ReplacementEngine.getReplacementBlockEntity(sId);
         }

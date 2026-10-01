@@ -1,34 +1,38 @@
 pluginManagement {
     repositories {
-        // 添加阿里云镜像（放在最前面）
+        // 阿里云公共仓库（放在最前，加速插件下载）
         maven {
             name = "Aliyun"
             url = "https://maven.aliyun.com/repository/public"
         }
+        // Fabric 官方插件仓库
         maven {
-            name = 'Fabric'
-            url = 'https://maven.fabricmc.net/'
+            name = "Fabric"
+            url = "https://maven.fabricmc.net/"
         }
         mavenCentral()
         gradlePluginPortal()
     }
 }
 
-// 添加全局仓库配置
 dependencyResolutionManagement {
     repositories {
+        // 阿里云公共仓库
         maven {
             name = "Aliyun"
             url = "https://maven.aliyun.com/repository/public"
         }
+        // 阿里云 Spring 仓库（部分依赖会用到）
         maven {
             name = "Aliyun Spring"
             url = "https://maven.aliyun.com/repository/spring"
         }
+        // Fabric 官方仓库
         maven {
-            name = 'Fabric'
-            url = 'https://maven.fabricmc.net/'
+            name = "Fabric"
+            url = "https://maven.fabricmc.net/"
         }
+        // Minecraft 官方库
         maven {
             name = "Minecraft"
             url = "https://libraries.minecraft.net"

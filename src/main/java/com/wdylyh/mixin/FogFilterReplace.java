@@ -81,9 +81,10 @@ public abstract class FogFilterReplace {
         // Universal fog replacement: replace the RGB of the computed fog color
         // with the color of the target fog identity. The first identity (in the
         // same priority order as the fog filter) that has a rule wins.
-        if (ReplacementEngine.isReplaceEnabled()
-                // The reveal hotkey skips the replacement (shows the original fog).
-                && !FilterEngine.isReplaceBlocked(FilterEngine.TYPE_FOG)) {
+        // No master-switch gate here: the coordinate rules below are gated by
+        // the coordinate replace toggle (global switch OFF), the global
+        // fallback checks the master switch internally.
+        if (!FilterEngine.isReplaceBlocked(FilterEngine.TYPE_FOG)) {
             FOG_IDENTITIES.clear();
             FilterEngine.getFogIdentities(cam.getSubmersionType(), world, cam.getCameraPos(), FOG_IDENTITIES);
             Vector4f col = cir.getReturnValue();
@@ -91,7 +92,7 @@ public abstract class FogFilterReplace {
             // rules; a rule inside it wins over the global list.
             Vec3d camPos = cam.getCameraPos();
             for (String id : FOG_IDENTITIES) {
-                String tid = ReplacementEngine.getReplacementFogAt(id, camPos.x, camPos.y, camPos.z);
+                String tid = ReplacementEngine.getReplacementFogAt(id, camPos.x, camPos.y, camPos.z, FilterEngine.TYPE_FOG);
                 if (tid == null) {
                     tid = ReplacementEngine.getReplacementFog(id);
                 }

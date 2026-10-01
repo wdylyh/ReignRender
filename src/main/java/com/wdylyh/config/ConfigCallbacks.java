@@ -141,51 +141,46 @@ public class ConfigCallbacks {
         RenderConfig.Filters.REPLACE_HELD_ITEMS.setValueChangeCallback(ConfigCallbacks::on_Frame_Replace_Config);
         RenderConfig.Filters.REPLACE_HUD_ELEMENTS.setValueChangeCallback(ConfigCallbacks::on_Frame_Replace_Config);
 
-        // Coordinate filter: the entries and the master toggle are baked into
-        // the block/fluid meshes, the mode drives both the baked and the
-        // per-frame paths (entities, particles, name tags). Invalidating the
-        // caches and rebuilding the meshes covers all of them.
+        // Coordinate filter: the master toggle is baked into the block/fluid
+        // meshes. The hide/keep entries come from the condition system
+        // (invalidated by on_Condition_Config below). Invalidating the caches
+        // and rebuilding the meshes covers all of them.
         RenderConfig.Hotkeys.TOGGLE_COORD_FILTER.setValueChangeCallback(ConfigCallbacks::on_Coord_Config);
-        RenderConfig.General.COORD_MODE.setValueChangeCallback(ConfigCallbacks::on_Coord_Config);
-        RenderConfig.Filters.COORD_ENTRIES.setValueChangeCallback(ConfigCallbacks::on_Coord_Config);
 
         // Coordinate aware replacements are baked into the block/fluid meshes
         // the same way the per-category block/fluid replacement lists are, so
-        // a change (including the master toggle) must rebuild the meshes, not
-        // just invalidate the caches.
+        // a change of the master toggle must rebuild the meshes, not just
+        // invalidate the caches (the replace entries come from the condition
+        // system).
         RenderConfig.Hotkeys.TOGGLE_COORD_REPLACE.setValueChangeCallback(ConfigCallbacks::on_Replace_Config);
-        RenderConfig.Filters.COORD_REPLACE_ENTRIES.setValueChangeCallback(ConfigCallbacks::on_Replace_Config);
 
         // Region face-mod: the toggle drives the generated
         // ReignRender_RegionFace resource pack (enable/disable + reload, which
-        // also re-bakes the models) and the entries need the same resource
-        // reload (a newly listed id gets its shadow resources generated), plus
-        // a chunk rebuild for the baked block path.
+        // also re-bakes the models). The face entries come from the condition
+        // system (see on_Condition_Config).
         RenderConfig.Hotkeys.TOGGLE_REGION_FACE.setValueChangeCallback(
                 config -> RegionFacePacks.onRegionConfigChanged());
-        RenderConfig.Filters.REGION_FACE_ENTRIES.setValueChangeCallback(config -> {
-            RegionFacePacks.onRegionConfigChanged();
-            rebuildMeshes();
-        });
+
+        // Condition system entries: the parsed views feed the coordinate
+        // filter, the coordinate replacement and the region face-mod, so a
+        // change invalidates every engine cache, re-applies the region face
+        // pack (a newly listed face id needs its shadow resources generated)
+        // and rebuilds the meshes for the baked block/fluid paths.
+        RenderConfig.Conditions.CONDITION_ENTRIES.setValueChangeCallback(ConfigCallbacks::on_Condition_Config);
 
         // Bootstrap: config values loaded from the json never fire their
-        // change callbacks, so apply the pack state once at startup.
-        RegionFacePacks.applyEnabled(RenderConfig.Hotkeys.TOGGLE_REGION_FACE.getBooleanValue());
+        // change callbacks, so apply the pack states once at startup. The
+        // second argument disables the redundant reload — the game's own
+        // initial resource load applies the (possibly changed) pack state,
+        // and an already correct state does nothing at all.
+        RegionFacePacks.applyEnabled(RenderConfig.Hotkeys.TOGGLE_REGION_FACE.getBooleanValue(), false);
+        FaceModPacks.applyEnabled(RenderConfig.General.ENABLE_FACE_MOD.getBooleanValue(), false);
 
         // The coordinate pick mode only changes what the pick hotkey does; it
         // does not touch any render data.
         RenderConfig.General.COORD_PICK_MODE.setValueChangeCallback(ConfigCallbacks::on_Log_Config);
 
         RenderConfig.Hotkeys.PICK_COORD_HOTKEY.getKeybind().setCallback(new Pick_Coord());
-
-        // Per-id render count/distance limits: evaluated per frame in the
-        // entity and particle render paths, with no chunk-baked data, so a
-        // change to either master switch or either list only needs the id
-        // caches invalidated.
-        RenderConfig.Hotkeys.TOGGLE_COUNT_LIMITS.setValueChangeCallback(ConfigCallbacks::on_Frame_Filter_Config);
-        RenderConfig.Hotkeys.TOGGLE_DISTANCE_LIMITS.setValueChangeCallback(ConfigCallbacks::on_Frame_Filter_Config);
-        RenderConfig.Filters.COUNT_LIMITS.setValueChangeCallback(ConfigCallbacks::on_Frame_Filter_Config);
-        RenderConfig.Filters.DISTANCE_LIMITS.setValueChangeCallback(ConfigCallbacks::on_Frame_Filter_Config);
     }
 
     private static void on_Frame_Replace_Config(IConfigBase config) {
@@ -230,6 +225,24 @@ public class ConfigCallbacks {
         // of its config changes must trigger a rebuild (the invalidation above
         // covers the per-frame entity/particle/name-tag paths). The rebuild
         // also re-reads the baked paths, so both are always kept in sync.
+        on_Render_Config(config);
+    }
+
+    /**
+     * A condition entry changed: the parsed views feed the coordinate filter,
+     * the coordinate replacement and the region face-mod, so all engine
+     * caches are invalidated, the region face pack re-applies (a newly listed
+     * face id needs its shadow resources generated) and the meshes rebuild
+     * for the baked block/fluid paths. The dist/count actions are evaluated
+     * live, the invalidation covers them as well.
+     */
+    private static void on_Condition_Config(IConfigBase config) {
+        ConditionEngine.invalidateCaches();
+        CoordinateFilter.invalidateCaches();
+        ReplacementEngine.invalidateCaches();
+        RegionFaceEngine.invalidateCaches();
+        RegionFacePacks.onRegionConfigChanged();
+        LOGGER.info("[ReignRender] condition config '{}' changed to: {}", config.getName(), describe_Config(config));
         on_Render_Config(config);
     }
 
@@ -411,8 +424,8 @@ public class ConfigCallbacks {
 
     /**
      * Picks the coordinates of the block currently being looked at into the
-     * coordinate filter list. Only fires on the press of the bound key (not
-     * the release).
+     * condition entry list (as a "region=..." entry). Only fires on the press
+     * of the bound key (not the release).
      * <p>
      * With {@link RenderConfig.General#COORD_PICK_MODE} set to "single" the looked-at block
      * position is stored directly as "x,y,z". With "box" the first press
@@ -478,20 +491,22 @@ public class ConfigCallbacks {
     }
 
     /**
-     * Toggles the given coordinate line in the coordinate entry list and
-     * reports the result to the player.
+     * Toggles the given coordinate region in the condition entry list (as a
+     * "region=..." entry with no actions, ready to be extended with acts in
+     * the GUI) and reports the result to the player.
      */
     private static void addCoord(String line) {
-        List<String> cur = new ArrayList<>(RenderConfig.Filters.COORD_ENTRIES.getStrings());
-        boolean added = !cur.remove(line);
+        String entry = "region=" + line;
+        List<String> cur = new ArrayList<>(RenderConfig.Conditions.CONDITION_ENTRIES.getStrings());
+        boolean added = !cur.remove(entry);
 
         if (added)
         {
-            cur.add(line);
+            cur.add(entry);
         }
 
-        RenderConfig.Filters.COORD_ENTRIES.setStrings(cur);
-        CoordinateFilter.invalidateCaches();
+        RenderConfig.Conditions.CONDITION_ENTRIES.setStrings(cur);
+        ConditionEngine.invalidateCaches();
         ToastRenderer.show(Text.translatable(added ? "reignrender.message.pickCoordAdded"
                                           : "reignrender.message.pickCoordRemoved", line),
                 added ? ToastRenderer.TOAST_COLOR_ADDED : ToastRenderer.TOAST_COLOR_REMOVED);

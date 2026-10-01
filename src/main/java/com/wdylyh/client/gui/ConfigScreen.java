@@ -56,11 +56,12 @@ public class ConfigScreen extends GuiConfigsBase implements IConfigGuiAllTab {
 
     @Override
     public List<ConfigOptionWrapper> getAllConfigs() {
-        List<ConfigOptionWrapper> configs = new ArrayList<>(RenderConfig.Toggles.OPTIONS.size() + RenderConfig.General.OPTIONS.size() + RenderConfig.Hotkeys.OPTIONS.size() + RenderConfig.Filters.OPTIONS.size() + RenderConfig.Face.OPTIONS.size());
+        List<ConfigOptionWrapper> configs = new ArrayList<>(RenderConfig.Toggles.OPTIONS.size() + RenderConfig.General.OPTIONS.size() + RenderConfig.Hotkeys.OPTIONS.size() + RenderConfig.Filters.OPTIONS.size() + RenderConfig.Conditions.OPTIONS.size() + RenderConfig.Face.OPTIONS.size());
         configs.addAll(ConfigOptionWrapper.createFor(RenderConfig.Toggles.OPTIONS));
         configs.addAll(ConfigOptionWrapper.createFor(RenderConfig.General.OPTIONS));
         configs.addAll(ConfigOptionWrapper.createFor(RenderConfig.Hotkeys.OPTIONS));
         configs.addAll(ConfigOptionWrapper.createFor(RenderConfig.Filters.OPTIONS));
+        configs.addAll(ConfigOptionWrapper.createFor(RenderConfig.Conditions.OPTIONS));
         configs.addAll(ConfigOptionWrapper.createFor(RenderConfig.Face.OPTIONS));
         return configs;
     }
@@ -84,6 +85,9 @@ public class ConfigScreen extends GuiConfigsBase implements IConfigGuiAllTab {
         }
         else if (tab == GTab.FILTER) {
             return ConfigOptionWrapper.createFor(RenderConfig.Filters.OPTIONS);
+        }
+        else if (tab == GTab.CONDITIONS) {
+            return ConfigOptionWrapper.createFor(RenderConfig.Conditions.OPTIONS);
         }
         else if (tab == GTab.FACE) {
             return ConfigOptionWrapper.createFor(RenderConfig.Face.OPTIONS);
@@ -116,6 +120,7 @@ public class ConfigScreen extends GuiConfigsBase implements IConfigGuiAllTab {
         GENERIC ("reignrender.gui.title.generic"),
         HOTKEYS ("reignrender.gui.title.hotkeys"),
         FILTER  ("reignrender.gui.title.config"),
+        CONDITIONS ("reignrender.gui.title.conditions"),
         FACE    ("reignrender.gui.title.face");
 
         private final String translationKey;

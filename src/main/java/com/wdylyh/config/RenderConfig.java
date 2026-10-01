@@ -24,7 +24,6 @@ import org.jetbrains.annotations.NotNull;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -36,24 +35,7 @@ public class RenderConfig implements IConfigHandler {
     private static final String HK_KEY = "reignrender.config.hotkeys";
     private static final String F_KEY = "reignrender.config.filter";
     private static final String FACE_KEY = "reignrender.config.face";
-
-    /**
-     * Set by {@link #migrateFogs} once the default fog identities have
-     * been merged into an older config, then persisted into the "Filter"
-     * section on the next save so the merge runs only once (a user who removes
-     * an entry afterwards keeps it removed).
-     */
-    private static final String FOGS_MIG_KEY = "filteredFogsMigratedV2";
-    private static boolean fogsMig = false;
-
-    /**
-     * Marks the second fog migration (adding the pumpkin overlay identity to
-     * the default fog list). Separate from {@link #FOGS_MIG_KEY}
-     * so an existing (already-V2) config still gets the new entry added once
-     * without re-adding every removed default entry.
-     */
-    private static final String FOGS_PUMPKIN_MIG_KEY = "filteredFogsMigratedV3";
-    private static boolean fogsPumpkinMig = false;
+    private static final String C_KEY = "reignrender.config.conditions";
 
     private static final List<IConfigBase> FILTER_MODES = List.of(
             Filters.ENTITY_MODE, Filters.BLOCK_MODE, Filters.FLUID_MODE,
@@ -174,19 +156,6 @@ public class RenderConfig implements IConfigHandler {
                 "filterInputMode", INPUT_MODE_VIEW, ImmutableList.of(INPUT_MODE_VIEW, INPUT_MODE_MANUAL)).apply(G_KEY);
 
         /**
-         * Mode of the coordinate filter (OFF / BLACKLIST / WHITELIST). The
-         * coordinate entries live on the Filter tab. OFF ("关闭"): the whole
-         * region of every entry is hidden, ignoring any attached ids.
-         * WHITELIST ("白名单"): only the objects whose id is attached to the
-         * entry are kept visible, everything else at that coordinate is hidden
-         * (an entry without attached ids therefore hides everything there).
-         * BLACKLIST ("黑名单"): only the objects whose id is attached to the
-         * entry are hidden.
-         */
-        public static final ConfigOptionValues<BaseOptionListConfigValue> COORD_MODE = new ConfigOptionValues<>(
-                "coordMode", Filters.MODE_OFF, ImmutableList.of(Filters.MODE_OFF, Filters.MODE_BLACKLIST, Filters.MODE_WHITELIST)).apply(G_KEY);
-
-        /**
          * How the coordinate pick hotkey selects positions. Single ("单方块"):
          * the looked-at block position is stored. Box ("多方块"): the hotkey
          * stores corner 1 on the first press and corner 2 on the second press.
@@ -220,8 +189,7 @@ public class RenderConfig implements IConfigHandler {
                 Filters.FOG_MODE,
                 Filters.NAME_TAG_MODE,
                 Filters.PLAYER_MODE,
-                // 坐标
-                COORD_MODE,
+                // 坐标选取
                 COORD_PICK_MODE,
                 // 解除热键
                 REVEAL_HOTKEY_MODE,
@@ -253,20 +221,21 @@ public class RenderConfig implements IConfigHandler {
         public static final ConfigHotkey PICK_ENTITY_HOTKEY = new ConfigHotkey("pickEntityHotkey", "", KeybindSettings.PRESS_ALLOWEXTRA).apply(HK_KEY);
 
         /**
-         * Master switch for the coordinate filter. When on, the entries in
-         * {@link RenderConfig.Filters#COORD_ENTRIES} hide everything at the listed
-         * coordinates according to {@link RenderConfig.General#COORD_MODE} (OFF hides the
-         * whole region, BLACKLIST/WHITELIST additionally match the optional
-         * ids attached to each entry). Independent of the per-category
-         * filters: the coordinates apply even when e.g. the entity filter is
-         * off.
+         * Master switch for the coordinate filter. When on, the hide/keep
+         * actions of the condition entries in
+         * {@link RenderConfig.Conditions#CONDITION_ENTRIES} hide objects at the
+         * listed regions (hide without ids hides the whole region, with ids
+         * only the listed ones; keep only leaves the listed ids visible).
+         * Independent of the per-category filters: the coordinates apply even
+         * when e.g. the entity filter is off.
          */
         public static final ConfigBooleanHotkeyed TOGGLE_COORD_FILTER = new ConfigBooleanHotkeyed("toggleCoordFilter", false, "").apply(HK_KEY);
 
         /**
          * Master switch for the coordinate aware replacement system. The
-         * region rules in {@link RenderConfig.Filters#COORD_REPLACE_ENTRIES} apply only
-         * while this switch is on AND the global replacement master switch
+         * replace actions of the condition entries in
+         * {@link RenderConfig.Conditions#CONDITION_ENTRIES} apply only while this
+         * switch is on AND the global replacement master switch
          * {@link RenderConfig.General#REPLACE_ENABLED} is OFF — the regional
          * mechanism is mutually exclusive with the global one and only takes
          * over when the global replacement is turned off.
@@ -274,10 +243,11 @@ public class RenderConfig implements IConfigHandler {
         public static final ConfigBooleanHotkeyed TOGGLE_COORD_REPLACE = new ConfigBooleanHotkeyed("toggleCoordReplace", false, "").apply(HK_KEY);
 
         /**
-         * Master switch for the region face-mod ("区域面修改"). The region
-         * texture edits in {@link RenderConfig.Filters#REGION_FACE_ENTRIES} apply only
-         * while this switch is on AND the global face modification
-         * {@link RenderConfig.General#ENABLE_FACE_MOD} is OFF — the regional
+         * Master switch for the coordinate face-mod ("指定坐标面修改"). The
+         * face actions of the condition entries in
+         * {@link RenderConfig.Conditions#CONDITION_ENTRIES} apply only while this
+         * switch is on AND the global face modification
+         * {@link RenderConfig.General#ENABLE_FACE_MOD} is OFF — the coordinate
          * mechanism is mutually exclusive with the global one and only takes
          * over when the global face mod is turned off.
          */
@@ -285,7 +255,7 @@ public class RenderConfig implements IConfigHandler {
 
         /**
          * Press while looking at a block to pick its position into the
-         * coordinate filter list. With {@link RenderConfig.General#COORD_PICK_MODE} set to
+         * condition entry list. With {@link RenderConfig.General#COORD_PICK_MODE} set to
          * "single" the looked-at position is stored directly; with "box" press
          * the hotkey once for corner 1 and again for corner 2 to store a
          * region.
@@ -294,18 +264,19 @@ public class RenderConfig implements IConfigHandler {
 
         /**
          * Master switch for the per-id render count limits. When on, the
-         * entries in {@link RenderConfig.Filters#COUNT_LIMITS} cap how many
-         * objects of each id are rendered per frame (entities) / spawned per
-         * frame (particles). Independent of the per-category filters: the
-         * caps apply even when e.g. the entity filter is off.
+         * count entries in {@link RenderConfig.Conditions#CONDITION_ENTRIES} cap
+         * how many objects of each id are rendered per frame (entities,
+         * particles, block entities) / baked per section (blocks).
+         * Independent of the per-category filters: the caps apply even when
+         * e.g. the entity filter is off.
          */
         public static final ConfigBooleanHotkeyed TOGGLE_COUNT_LIMITS = new ConfigBooleanHotkeyed("toggleCountLimits", false, "").apply(HK_KEY);
 
         /**
          * Master switch for the per-id render distance limits. When on, the
-         * entries in {@link RenderConfig.Filters#DISTANCE_LIMITS} hide
-         * entities / particles whose distance to the camera exceeds their
-         * per-id cap (in blocks). Independent of the per-category filters.
+         * dist entries in {@link RenderConfig.Conditions#CONDITION_ENTRIES} hide
+         * objects farther than their per-id cap (in blocks) from the camera.
+         * Independent of the per-category filters.
          */
         public static final ConfigBooleanHotkeyed TOGGLE_DISTANCE_LIMITS = new ConfigBooleanHotkeyed("toggleDistanceLimits", false, "").apply(HK_KEY);
 
@@ -366,83 +337,20 @@ public class RenderConfig implements IConfigHandler {
         public static final ConfigStringList FILTERED_PARTICLES = new ConfigStringList("filteredParticles", ImmutableList.of()).apply(F_KEY);
         public static final ConfigStringList FILTERED_ARMOR = new ConfigStringList("filteredArmor", ImmutableList.of()).apply(F_KEY);
         /**
-         * Every vanilla biome id of the target Minecraft version plus the four
+         * Fog identities hidden or kept by the fog filter. The list starts
+         * empty (so the reset button clears it, like every other filter
+         * list); ids are added through the picker, the pick hotkey or manual
+         * input. Supported identities: camera submersion fog types (water,
+         * lava, powder_snow, atmospheric), biome ids, dimension ids and the
          * status-effect fog identities ({@link FilterEngine#FOG_EFFECT_BLINDNESS}
-         * etc.). With the fog filter in BLACKLIST mode this hides the fog of all
-         * biomes and effect fogs by default; remove an id to stop filtering it.
+         * etc.). With the fog filter in BLACKLIST mode every listed id is
+         * hidden.
          */
-        public static final ConfigStringList FILTERED_FOGS = new ConfigStringList("filteredFogs", ImmutableList.of(
-                "minecraft:badlands", "minecraft:bamboo_jungle", "minecraft:basalt_deltas", "minecraft:beach",
-                "minecraft:birch_forest", "minecraft:cherry_grove", "minecraft:cold_ocean", "minecraft:crimson_forest",
-                "minecraft:dark_forest", "minecraft:deep_cold_ocean", "minecraft:deep_dark", "minecraft:deep_frozen_ocean",
-                "minecraft:deep_lukewarm_ocean", "minecraft:deep_ocean", "minecraft:desert", "minecraft:dripstone_caves",
-                "minecraft:end_barrens", "minecraft:end_highlands", "minecraft:end_midlands", "minecraft:eroded_badlands",
-                "minecraft:flower_forest", "minecraft:forest", "minecraft:frozen_ocean", "minecraft:frozen_peaks",
-                "minecraft:frozen_river", "minecraft:grove", "minecraft:ice_spikes", "minecraft:jagged_peaks",
-                "minecraft:jungle", "minecraft:lukewarm_ocean", "minecraft:lush_caves", "minecraft:mangrove_swamp",
-                "minecraft:meadow", "minecraft:mushroom_fields", "minecraft:nether_wastes", "minecraft:ocean",
-                "minecraft:old_growth_birch_forest", "minecraft:old_growth_pine_taiga", "minecraft:old_growth_spruce_taiga",
-                "minecraft:pale_garden", "minecraft:plains", "minecraft:river", "minecraft:savanna",
-                "minecraft:savanna_plateau", "minecraft:small_end_islands", "minecraft:snowy_beach",
-                "minecraft:snowy_plains", "minecraft:snowy_slopes", "minecraft:snowy_taiga", "minecraft:soul_sand_valley",
-                "minecraft:sparse_jungle", "minecraft:stony_peaks", "minecraft:stony_shore", "minecraft:sunflower_plains",
-                "minecraft:swamp", "minecraft:taiga", "minecraft:the_end", "minecraft:the_void", "minecraft:warm_ocean",
-                "minecraft:warped_forest", "minecraft:windswept_forest", "minecraft:windswept_gravelly_hills",
-                "minecraft:windswept_hills", "minecraft:windswept_savanna", "minecraft:wooded_badlands",
-                FilterEngine.FOG_EFFECT_BLINDNESS, FilterEngine.FOG_EFFECT_DARKNESS,
-                FilterEngine.FOG_EFFECT_WITHER, FilterEngine.FOG_EFFECT_NIGHT_VISION,
-                FilterEngine.FOG_EFFECT_PUMPKIN
-        )).apply(F_KEY);
+        public static final ConfigStringList FILTERED_FOGS = new ConfigStringList("filteredFogs", ImmutableList.of()).apply(F_KEY);
 
         // Name based filters (semicolon separated names in a single text box).
         public static final ConfigString FILTERED_NAME_TAGS = new ConfigString("filteredNameTags", "").apply(F_KEY);
         public static final ConfigString FILTERED_PLAYERS = new ConfigString("filteredPlayers", "").apply(F_KEY);
-
-        /**
-         * Coordinate filter entries. Each entry is a coordinate target plus
-         * optional additional ids (separated by semicolons):
-         *   "x,y,z"                  a single block position
-         *   "x1,y1,z1~x2,y2,z2"      the region between two corners
-         *   "x,y,z;id;id"            coordinate target with attached ids
-         * The ids are matched by registry id (blocks, entities, particles,
-         * block entities, fluids, name tags/player names as text). Coordinates
-         * are matched in every dimension. See {@link RenderConfig.General#COORD_MODE} for
-         * how the mode uses the attached ids.
-         */
-        public static final ConfigStringList COORD_ENTRIES = new ConfigStringList("coordEntries", ImmutableList.of()).apply(F_KEY);
-
-        /**
-         * Coordinate aware render replacement entries. Like the coordinate
-         * filter entries, each line starts with a coordinate target; instead
-         * of attached ids it carries one or more "source=target" replacement
-         * rules (the same syntax as the per-category replacement lists):
-         *   "x,y,z;minecraft:stone=minecraft:glass"
-         *   "x1,y1,z1~x2,y2,z2;minecraft:stone=minecraft:glass;minecraft:dirt=minecraft:sand"
-         * A rule's source id decides its category the same way the attached
-         * ids of the coordinate filter do (blocks, entities, particles,
-         * fluids; ids that resolve to no registry match name tags / player
-         * names as text). While the {@link RenderConfig.General.REPLACE_ENABLED} master
-         * switch is on, a replacement found inside a matched region takes
-         * precedence over the global per-category replacement lists.
-         */
-        public static final ConfigStringList COORD_REPLACE_ENTRIES = new ConfigStringList("coordReplaceEntries", ImmutableList.of()).apply(F_KEY);
-
-        /**
-         * Region face-mod ("区域面修改") entries. Each line starts with a
-         * coordinate target plus optional attached ids (the same syntax as the
-         * coordinate filter entries):
-         *   "x,y,z"                  a single block position
-         *   "x1,y1,z1~x2,y2,z2"      the region between two corners
-         *   "x,y,z;id;id"            coordinate target with attached ids
-         * While the {@link RenderConfig.Hotkeys#TOGGLE_REGION_FACE} master switch is on
-         * (and the global face mod is off), the objects whose id is attached to
-         * a matching entry — or every object, when the entry carries no ids —
-         * render with the textures edited for them in the region face GUI
-         * ({@link RegionFaceIndex} / {@link RegionFacePacks}). Covered
-         * categories: blocks (incl. falling blocks), entities, particles and
-         * items (dropped / held).
-         */
-        public static final ConfigStringList REGION_FACE_ENTRIES = new ConfigStringList("regionFaceEntries", ImmutableList.of()).apply(F_KEY);
 
         /**
          * HUD element ids hidden while the "Disable HUD Elements" toggle is on
@@ -452,26 +360,6 @@ public class RenderConfig implements IConfigHandler {
          */
         public static final ConfigStringList HIDDEN_HUD_ELEMENTS = new ConfigStringList(
                 "hiddenHudElements", ImmutableList.of()).apply(F_KEY);
-
-        /**
-         * Per-id render count limits. Each entry is "id=number" (e.g.
-         * "minecraft:creeper=20"); while the {@link RenderConfig.Hotkeys#TOGGLE_COUNT_LIMITS}
-         * master switch is on, at most {@code number} objects of that id are
-         * rendered per frame (entities) / spawned per frame (particles).
-         * -1 disables the limit for that id. Independent of the per-category
-         * filters: the caps apply even when e.g. the entity filter is off.
-         */
-        public static final ConfigStringList COUNT_LIMITS = new ConfigStringList("countLimits", ImmutableList.of()).apply(F_KEY);
-
-        /**
-         * Per-id render distance limits. Each entry is "id=blocks" (e.g.
-         * "minecraft:creeper=32"); while the {@link RenderConfig.Hotkeys#TOGGLE_DISTANCE_LIMITS}
-         * master switch is on, objects of that id farther than {@code blocks}
-         * from the camera are hidden (entities in the entity render pass,
-         * particles at spawn time). -1 disables the limit for that id.
-         * Independent of the per-category filters.
-         */
-        public static final ConfigStringList DISTANCE_LIMITS = new ConfigStringList("distanceLimits", ImmutableList.of()).apply(F_KEY);
 
         /**
          * Universal render replacement lists. Each entry is "source=target"
@@ -527,13 +415,6 @@ public class RenderConfig implements IConfigHandler {
                 FILTERED_NAME_TAGS,
                 FILTERED_PLAYERS,
                 HIDDEN_HUD_ELEMENTS,
-                // 坐标
-                COORD_ENTRIES,
-                COORD_REPLACE_ENTRIES,
-                REGION_FACE_ENTRIES,
-                // 限制
-                COUNT_LIMITS,
-                DISTANCE_LIMITS,
                 // 替换列表
                 REPLACE_PARTICLES,
                 REPLACE_BLOCKS,
@@ -590,6 +471,27 @@ public class RenderConfig implements IConfigHandler {
         );
     }
 
+    /**
+     * Unified condition system ("条件系统"). Each entry is one semicolon
+     * separated {@code key=value} line combining conditions (region / dist /
+     * count / ids) with actions (hide / keep / replace:src=dst / face); the
+     * parsed details and the queries live in {@link ConditionEngine}. The
+     * actions reuse the existing engines: hide/keep feed the coordinate
+     * filter ({@link RenderConfig.Hotkeys#TOGGLE_COORD_FILTER}), replace feeds
+     * the coordinate replacement ({@link RenderConfig.Hotkeys#TOGGLE_COORD_REPLACE}),
+     * face feeds the region face-mod ({@link RenderConfig.Hotkeys#TOGGLE_REGION_FACE})
+     * and dist/count are gated by {@link RenderConfig.Hotkeys#TOGGLE_DISTANCE_LIMITS} /
+     * {@link RenderConfig.Hotkeys#TOGGLE_COUNT_LIMITS}.
+     */
+    public static class Conditions {
+        public static final ConfigStringList CONDITION_ENTRIES = new ConfigStringList(
+                "conditionEntries", ImmutableList.of()).apply(C_KEY);
+
+        public static final ImmutableList<@NotNull IConfigBase> OPTIONS = ImmutableList.of(
+                CONDITION_ENTRIES
+        );
+    }
+
     @Override
     public void load() {
         File configFile = cfgFile();
@@ -602,13 +504,13 @@ public class RenderConfig implements IConfigHandler {
                 migrateModes(root);
                 migrateRevealMode(root);
                 migrateFaceToggle(root);
+                migrateConditions(root);
                 ConfigUtils.readConfigBase(root, "Disable", Toggles.OPTIONS);
                 ConfigUtils.readConfigBase(root, "Generic", General.OPTIONS);
                 ConfigUtils.readConfigBase(root, "Hotkeys", Hotkeys.OPTIONS);
                 ConfigUtils.readConfigBase(root, "Filter", Filters.OPTIONS);
                 ConfigUtils.readConfigBase(root, "Face", Face.OPTIONS);
-                migrateFogs(root);
-                migrateFogsPumpkin(root);
+                ConfigUtils.readConfigBase(root, "Conditions", Conditions.OPTIONS);
             }
         }
 
@@ -686,76 +588,149 @@ public class RenderConfig implements IConfigHandler {
     }
 
     /**
-     * The fog filter list grew from a small default to every vanilla biome plus
-     * the status-effect fogs (blindness, darkness, wither, night vision). Older
-     * configs still store the old (short) list, so the missing default entries
-     * are merged into the loaded list while the user's own entries are kept.
-     * Runs only once per config: the marker written on the next save (see
-     * {@link #FOGS_MIG_KEY}) prevents re-adding entries the user
-     * removed afterwards.
+     * Migrates the old scattered coordinate/limit lists into the unified
+     * condition system:
+     * <ul>
+     *   <li>Filter.coordEntries → region entries with the action chosen by the
+     *       old coordinate mode (OFF = whole-region hide, BLACKLIST = hide with
+     *       ids, WHITELIST = keep with ids)</li>
+     *   <li>Filter.coordReplaceEntries → replace actions</li>
+     *   <li>Filter.regionFaceEntries → face actions</li>
+     *   <li>Filter.countLimits / Filter.distanceLimits ("id=N") → count / dist
+     *       entries with ids</li>
+     * </ul>
+     * The converted lines are written into Conditions.conditionEntries (only
+     * when that key is not already present, so a re-migration never overwrites
+     * newer edits) and the old keys are removed from the json.
      */
-    private static void migrateFogs(JsonObject root) {
+    private static void migrateConditions(JsonObject root) {
         JsonObject filter = root.getAsJsonObject("Filter");
 
-        if (filter == null || !filter.has("filteredFogs")) {
-            // No stored list: the default list is already active.
-            fogsMig = true;
+        if (filter == null) {
             return;
         }
 
-        if (filter.has(FOGS_MIG_KEY)) {
-            // Migration is already done. Remember the fact even on this path:
-            // save() only writes the JSON marker back when this static flag is
-            // set, and without it the marker would be dropped on the next save,
-            // causing a re-migration (and re-adding every default entry the
-            // player removed) on the next load.
-            fogsMig = true;
-            return;
+        // The old coordinate mode decides the action of the coord entries.
+        String coordMode = "off";
+        JsonObject generic = root.getAsJsonObject("Generic");
+        if (generic != null && generic.has("coordMode") && generic.get("coordMode").isJsonPrimitive()) {
+            coordMode = generic.get("coordMode").getAsString();
         }
 
-        List<String> merged = new ArrayList<>(RenderConfig.Filters.FILTERED_FOGS.getStrings());
-        Set<String> seen = new HashSet<>(merged);
+        List<String> out = new ArrayList<>();
 
-        for (String id : RenderConfig.Filters.FILTERED_FOGS.getDefaultStrings()) {
-            if (seen.add(id)) {
-                merged.add(id);
+        if (filter.has("coordEntries") && filter.get("coordEntries").isJsonArray()) {
+            for (JsonElement el : filter.getAsJsonArray("coordEntries")) {
+                if (!el.isJsonPrimitive()) {
+                    continue;
+                }
+                String[] parts = el.getAsString().split(";", -1);
+                String box = parts[0].trim();
+                StringBuilder ids = new StringBuilder();
+                for (int i = 1; i < parts.length; i++) {
+                    String id = parts[i].trim();
+                    if (!id.isEmpty()) {
+                        if (ids.length() > 0) {
+                            ids.append(',');
+                        }
+                        ids.append(id);
+                    }
+                }
+                switch (coordMode) {
+                    case "whitelist" -> out.add("region=" + box
+                            + (ids.length() > 0 ? ";ids=" + ids : "") + ";acts=keep");
+                    case "blacklist" -> out.add("region=" + box
+                            + (ids.length() > 0 ? ";ids=" + ids : "") + ";acts=blacklist");
+                    // OFF mode hid the whole region regardless of any ids.
+                    default -> out.add("region=" + box + ";acts=hide");
+                }
             }
         }
 
-        RenderConfig.Filters.FILTERED_FOGS.setStrings(merged);
-        fogsMig = true;
-    }
-
-    /**
-     * Adds the pumpkin overlay fog identity ({@link FilterEngine#FOG_EFFECT_PUMPKIN})
-     * to the default fog list of an existing config that predates that entry.
-     * Unlike the V2 migration this only ever inserts the single new identity
-     * (never re-adding the full default list), so it is safe to run on an
-     * already-V2 config. The marker is persisted on the next save so the entry
-     * is only re-added if the player removes it and the list is genuinely
-     * re-migrated.
-     */
-    private static void migrateFogsPumpkin(JsonObject root) {
-        JsonObject filter = root.getAsJsonObject("Filter");
-
-        if (filter == null || !filter.has("filteredFogs")) {
-            // No stored list: the default list (already including pumpkin) is active.
-            fogsPumpkinMig = true;
-            return;
+        if (filter.has("coordReplaceEntries") && filter.get("coordReplaceEntries").isJsonArray()) {
+            for (JsonElement el : filter.getAsJsonArray("coordReplaceEntries")) {
+                if (!el.isJsonPrimitive()) {
+                    continue;
+                }
+                String[] parts = el.getAsString().split(";", -1);
+                if (parts.length < 2) {
+                    continue;
+                }
+                StringBuilder acts = new StringBuilder();
+                for (int i = 1; i < parts.length; i++) {
+                    String rule = parts[i].trim();
+                    if (!rule.isEmpty()) {
+                        if (acts.length() > 0) {
+                            acts.append(',');
+                        }
+                        acts.append("replace:").append(rule);
+                    }
+                }
+                if (acts.length() > 0) {
+                    out.add("region=" + parts[0].trim() + ";acts=" + acts);
+                }
+            }
         }
 
-        if (filter.has(FOGS_PUMPKIN_MIG_KEY)) {
-            fogsPumpkinMig = true;
-            return;
+        if (filter.has("regionFaceEntries") && filter.get("regionFaceEntries").isJsonArray()) {
+            for (JsonElement el : filter.getAsJsonArray("regionFaceEntries")) {
+                if (!el.isJsonPrimitive()) {
+                    continue;
+                }
+                String[] parts = el.getAsString().split(";", -1);
+                StringBuilder ids = new StringBuilder();
+                for (int i = 1; i < parts.length; i++) {
+                    String id = parts[i].trim();
+                    if (!id.isEmpty()) {
+                        if (ids.length() > 0) {
+                            ids.append(',');
+                        }
+                        ids.append(id);
+                    }
+                }
+                out.add("region=" + parts[0].trim()
+                        + (ids.length() > 0 ? ";ids=" + ids : "") + ";acts=face");
+            }
         }
 
-        List<String> merged = new ArrayList<>(RenderConfig.Filters.FILTERED_FOGS.getStrings());
-        if (!merged.contains(FilterEngine.FOG_EFFECT_PUMPKIN)) {
-            merged.add(FilterEngine.FOG_EFFECT_PUMPKIN);
-            RenderConfig.Filters.FILTERED_FOGS.setStrings(merged);
+        for (String[] limits : new String[][] {{"countLimits", "count"}, {"distanceLimits", "dist"}}) {
+            if (filter.has(limits[0]) && filter.get(limits[0]).isJsonArray()) {
+                for (JsonElement el : filter.getAsJsonArray(limits[0])) {
+                    if (!el.isJsonPrimitive()) {
+                        continue;
+                    }
+                    String[] pair = el.getAsString().split("=", -1);
+                    if (pair.length == 2 && !pair[0].trim().isEmpty() && !pair[1].trim().isEmpty()) {
+                        out.add(limits[1] + "=" + pair[1].trim() + ";ids=" + pair[0].trim());
+                    }
+                }
+            }
         }
 
-        fogsPumpkinMig = true;
+        // Remove the migrated keys so the migration runs only once.
+        for (String key : new String[] {"coordEntries", "coordReplaceEntries",
+                "regionFaceEntries", "countLimits", "distanceLimits"}) {
+            filter.remove(key);
+        }
+        if (generic != null) {
+            generic.remove("coordMode");
+        }
+
+        if (!out.isEmpty()) {
+            JsonObject conds = root.getAsJsonObject("Conditions");
+            if (conds == null) {
+                conds = new JsonObject();
+                root.add("Conditions", conds);
+            }
+            // Never overwrite entries a newer version already saved.
+            if (!conds.has("conditionEntries")) {
+                com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
+                for (String line : out) {
+                    arr.add(line);
+                }
+                conds.add("conditionEntries", arr);
+            }
+        }
     }
 
     /**
@@ -792,20 +767,7 @@ public class RenderConfig implements IConfigHandler {
         ConfigUtils.writeConfigBase(root, "Hotkeys", Hotkeys.OPTIONS);
         ConfigUtils.writeConfigBase(root, "Filter", Filters.OPTIONS);
         ConfigUtils.writeConfigBase(root, "Face", Face.OPTIONS);
-
-        if (fogsMig) {
-            JsonObject filter = JsonUtils.getNestedObject(root, "Filter", true);
-            if (filter != null) {
-                filter.addProperty(FOGS_MIG_KEY, true);
-            }
-        }
-
-        if (fogsPumpkinMig) {
-            JsonObject filter = JsonUtils.getNestedObject(root, "Filter", true);
-            if (filter != null) {
-                filter.addProperty(FOGS_PUMPKIN_MIG_KEY, true);
-            }
-        }
+        ConfigUtils.writeConfigBase(root, "Conditions", Conditions.OPTIONS);
 
         JsonUtils.writeJsonToFile(root, new File(configDir, CFG_FILE));
     }

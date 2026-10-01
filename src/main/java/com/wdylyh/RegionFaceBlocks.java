@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.wdylyh.ModReference;
-import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
@@ -58,8 +57,12 @@ public class RegionFaceBlocks {
         for (Block b : vanilla) {
             Identifier id = ReignRenderMod.id("rface_" + Registries.BLOCK.getId(b).getPath());
             RegistryKey<Block> key = RegistryKey.of(RegistryKeys.BLOCK, id);
+            // The shadow mirrors the vanilla block's state properties: the
+            // generated blockstate json is copied from the vanilla one and
+            // keeps its property-keyed variants, which a plain property-less
+            // block would reject ("Unknown blockstate property").
             Block shadow = Registry.register(Registries.BLOCK, key,
-                    new Block(AbstractBlock.Settings.create().registryKey(key)));
+                    ShadowBlocks.createMirrorShadow(key, b));
             SHADOWS.put(b, shadow);
         }
 

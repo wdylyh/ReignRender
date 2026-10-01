@@ -138,25 +138,6 @@ public class FilterEngine {
     /** Cached HUD element ids from HIDDEN_HUD_ELEMENTS (Set lookup, rebuilt on config change). */
     private static volatile Set<String> hidden_Hud_Elements = Set.of();
 
-    /**
-     * Parsed per-id render count limits from {@link RenderConfig.Filters#COUNT_LIMITS},
-     * keyed by registry id with the -1-for-unlimited semantics already applied
-     * (values are never below -1). Rebuilt together with the filter sets.
-     */
-    private static volatile Map<String, Integer> countLimits = Map.of();
-
-    /**
-     * Parsed per-id render distance limits from {@link RenderConfig.Filters#DISTANCE_LIMITS}
-     * (values are block counts, -1 meaning unlimited). Same rebuild cycle.
-     */
-    private static volatile Map<String, Integer> distLimits = Map.of();
-
-    /**
-     * Per-frame counters for the count limits, one entry per id, reset at the
-     * start of every render frame (see {@link #frame()}).
-     */
-    private static final Map<String, Integer> countUsed = new ConcurrentHashMap<>();
-
     private static volatile boolean dirty = true;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FilterEngine.class);
@@ -243,13 +224,6 @@ public class FilterEngine {
                     ITEM_ID_CACHE.clear();
                     BIOME_ID_CACHE.clear();
                     DIMENSION_ID_CACHE.clear();
-
-                    // The per-id limit entries ("id=number") are parsed into maps so the
-                    // per-frame lookups are O(1). Invalid entries are skipped silently;
-                    // the GUI already rejects them on input.
-                    countLimits = Collections.unmodifiableMap(parseLimits(RenderConfig.Filters.COUNT_LIMITS.getStrings()));
-                    distLimits = Collections.unmodifiableMap(parseLimits(RenderConfig.Filters.DISTANCE_LIMITS.getStrings()));
-                    countUsed.clear();
 
                     dirty = false;
                 }
@@ -624,10 +598,10 @@ public class FilterEngine {
         downCache = keyDown();
         sampled = true;
 
-        // Reset the per-frame count budget: the count limits cap how many
-        // objects of each id are rendered/spawned in a single frame, so the
-        // counters start fresh exactly once per frame.
-        countUsed.clear();
+        // The condition system's per-frame count budget and camera sample are
+        // refreshed here too (the count limits reset once per frame, the
+        // camera position feeds the block-baking distance checks).
+        ConditionEngine.frame();
 
         // The block/fluid chunk meshes are baked with the reveal behavior that
         // was current when they were built. Rebuild them whenever the physical
@@ -639,95 +613,6 @@ public class FilterEngine {
             builtDown = downCache;
             ConfigCallbacks.rebuildMeshes();
         }
-    }
-
-    /**
-     * Parses "id=number" entries into an id -> number map. Entries that are
-     * not a valid pair (no '=', empty id, non-integer or below -1 number) are
-     * dropped. Later entries override earlier ones for the same id.
-     */
-    private static Map<String, Integer> parseLimits(List<String> entries) {
-        Map<String, Integer> out = new HashMap<>();
-
-        for (String entry : entries) {
-            int eq = entry.indexOf('=');
-
-            if (eq <= 0) {
-                continue;
-            }
-
-            String id = entry.substring(0, eq).trim();
-
-            if (id.isEmpty()) {
-                continue;
-            }
-
-            try {
-                int value = Integer.parseInt(entry.substring(eq + 1).trim());
-
-                if (value >= -1) {
-                    out.put(id, value);
-                }
-            }
-            catch (NumberFormatException ignored) {}
-        }
-
-        return out;
-    }
-
-    /**
-     * Consumes one unit of the per-frame count budget for the given id and
-     * reports whether the budget is now exceeded (the object should not
-     * render). Ids without an entry, ids limited to -1 and the first {@code n}
-     * objects of a limited id are all allowed; the {@code n+1}th and later
-     * ones are rejected until the next {@link #frame()} resets the budget.
-     */
-    public static boolean countLimitExceeded(String id) {
-        if (id == null) {
-            return false;
-        }
-
-        rebuild();
-
-        // No entry or "-1=infinite": always allowed.
-        Integer cap = countLimits.get(id);
-
-        if (cap == null || cap < 0) {
-            return false;
-        }
-
-        // merge returns the value after adding 1; the budget is exceeded as
-        // soon as the used count goes past the cap.
-        int used = countUsed.merge(id, 1, Integer::sum);
-        return used > cap;
-    }
-
-    /**
-     * True when the object at (x,y,z) is farther from the camera position
-     * (cx,cy,cz) than the id's distance limit. A negative or missing limit
-     * means infinite distance, so only the distance cap applies; the caller
-     * supplies both object and camera coordinates to avoid a per-entity camera
-     * lookup.
-     */
-    public static boolean distanceLimitExceeded(String id,
-                                                double x, double y, double z,
-                                                double cx, double cy, double cz) {
-        if (id == null) {
-            return false;
-        }
-
-        rebuild();
-
-        Integer cap = distLimits.get(id);
-
-        if (cap == null || cap < 0) {
-            return false;
-        }
-
-        double dx = x - cx;
-        double dy = y - cy;
-        double dz = z - cz;
-        return dx * dx + dy * dy + dz * dz > (double) cap * cap;
     }
 
     public static boolean isBlockFiltered(BlockState state) {

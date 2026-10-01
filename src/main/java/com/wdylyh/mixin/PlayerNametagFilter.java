@@ -50,14 +50,17 @@ public abstract class PlayerNametagFilter {
             ci.cancel();
             return;
         }
-        if (ReplacementEngine.isReplaceEnabled()) {
+        // No master-switch gate: the coordinate rules below are gated by the
+        // coordinate replace toggle (global switch OFF), the global fallback
+        // checks the master switch internally.
+        {
             // The reveal hotkey skips the replacement (shows the original name).
             if (FilterEngine.isReplaceBlocked(FilterEngine.TYPE_PLAYER_NAMES)) {
                 return;
             }
             // Coordinate aware rules win over the global list, exactly like
             // the non-player name tag path in EntityNametagFilter.
-            String rep = ReplacementEngine.getReplacementPlayerNameAt(src, st.x, st.y, st.z);
+            String rep = ReplacementEngine.getReplacementPlayerNameAt(src, st.x, st.y, st.z, FilterEngine.TYPE_PLAYER_NAMES);
             if (rep == null) {
                 rep = ReplacementEngine.getReplacementPlayerName(src);
             }

@@ -51,7 +51,10 @@ public abstract class EntityNametagFilter {
             ci.cancel();
             return;
         }
-        if (ReplacementEngine.isReplaceEnabled()) {
+        // No master-switch gate: the coordinate rules below are gated by the
+        // coordinate replace toggle (global switch OFF), the global fallback
+        // checks the master switch internally.
+        {
             // The reveal hotkey skips the replacement (shows the original name).
             if (FilterEngine.isReplaceBlocked(FilterEngine.TYPE_NAME_TAGS)) {
                 return;
@@ -59,7 +62,7 @@ public abstract class EntityNametagFilter {
             // Coordinate aware rules win over the global list: a rule inside
             // the region the entity sits in (render state x/y/z) replaces its
             // label directly, anything else falls back to the global list.
-            String rep = ReplacementEngine.getReplacementNameTagAt(src, st.x, st.y, st.z);
+            String rep = ReplacementEngine.getReplacementNameTagAt(src, st.x, st.y, st.z, FilterEngine.TYPE_NAME_TAGS);
             if (rep == null) {
                 rep = ReplacementEngine.getReplacementNameTag(src);
             }

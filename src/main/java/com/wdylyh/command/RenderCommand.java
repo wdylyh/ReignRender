@@ -54,16 +54,16 @@ public final class RenderCommand {
     /** 24 option ids -> the render toggles (20 disable switches + replace + coords + count/distance limit master switches). */
     private static final Map<String, ConfigBoolean> OPTIONS = new LinkedHashMap<>();
 
-    /** 25 list categories (10 filter lists + 11 replace rule lists + coords + replace_coords + count/distance limits). */
+    /** 22 list categories (10 filter lists + 11 replace rule lists + the condition entries). */
     private static final Map<String, List_Category> LISTS = new LinkedHashMap<>();
 
     /** 27 keybind ids (22 hotkeyed option toggles + 5 dedicated hotkeys). */
     private static final Map<String, IHotkey> KEYS = new LinkedHashMap<>();
 
-    /** 10 categories that have a filter mode (9 filter lists + coords). */
+    /** 9 categories that have a filter mode (the 9 filter lists). */
     private static final Map<String, ConfigOptionValues<BaseOptionListConfigValue>> MODES = new LinkedHashMap<>();
 
-    /** 8 "mode others" configs. */
+    /** 7 "mode others" configs. */
     private static final Map<String, Other> OTHERS = new LinkedHashMap<>();
 
     /** Special fog ids without a registry (camera submersion + status effects). */
@@ -135,19 +135,9 @@ public final class RenderCommand {
         registerList("replace_held_items", RenderConfig.Filters.REPLACE_HELD_ITEMS, build_Replace_Validator(RenderCommand::normalize_Item));
         registerList("replace_hud_elements", RenderConfig.Filters.REPLACE_HUD_ELEMENTS, replace_Text_Pair_Validator());
 
-        // Coordinate filter entries: "x,y,z", "x1,y1,z1~x2,y2,z2" or with
-        // optional attached ids after a semicolon.
-        registerList("coords", RenderConfig.Filters.COORD_ENTRIES, RenderCommand::normalize_Coord);
-
-        // Coordinate aware replacement entries: a coordinate target followed
-        // by one or more "source=target" rules ("x,y,z;minecraft:stone=minecraft:glass").
-        registerList("replace_coords", RenderConfig.Filters.COORD_REPLACE_ENTRIES, RenderCommand::normalize_Coord_Replace);
-
-        // Per-id render count/distance limits: "id=number" entries where the
-        // id is an entity or particle registry id and the number is -1
-        // (unlimited) or a non-negative cap.
-        registerList("limit_counts", RenderConfig.Filters.COUNT_LIMITS, RenderCommand::normalize_Limit);
-        registerList("limit_distances", RenderConfig.Filters.DISTANCE_LIMITS, RenderCommand::normalize_Limit);
+        // Condition system entries: a semicolon separated key=value list per
+        // line ("region=x1,y1,z1~x2,y2,z2;dist=32;count=5;ids=a,b;acts=hide").
+        registerList("conditions", RenderConfig.Conditions.CONDITION_ENTRIES, RenderCommand::normalize_Condition);
 
         // Keybinds: the hotkeyed option toggles plus the 5 dedicated hotkeys.
         // "replace" has no hotkey and "coords" already has the dedicated
@@ -174,17 +164,12 @@ public final class RenderCommand {
         registerMode("text_name", RenderConfig.Filters.NAME_TAG_MODE);
         registerMode("other_players", RenderConfig.Filters.PLAYER_MODE);
 
-        // The coordinate filter mode shares the off/black/white values with
-        // the per-type filter modes, so parse_Filter_Mode applies as-is.
-        registerMode("coords", RenderConfig.General.COORD_MODE);
-
         registerOther("keep_sign_text", RenderConfig.General.KEEP_SIGN_TEXT, Other_Kind.BOOL);
 
         registerOther("replace_enabled", RenderConfig.General.REPLACE_ENABLED, Other_Kind.BOOL);
         registerOther("reveal_hotkey_mode", RenderConfig.General.REVEAL_HOTKEY_MODE, Other_Kind.OPTION);
         registerOther("filter_input_mode", RenderConfig.General.FILTER_INPUT_MODE, Other_Kind.OPTION);
         registerOther("coord_pick_mode", RenderConfig.General.COORD_PICK_MODE, Other_Kind.OPTION);
-        registerOther("coord_mode", RenderConfig.General.COORD_MODE, Other_Kind.OPTION_ALIAS);
         registerOther("reveal_affected_types", RenderConfig.General.REVEAL_AFFECTED_TYPES, Other_Kind.TYPES);
     }
 
@@ -832,144 +817,17 @@ public final class RenderCommand {
     }
 
     /**
-     * Validator for a "id=number" limit entry ("minecraft:creeper=20"):
-     * the id must match an entity or particle registry id and the number
-     * must be -1 (unlimited) or a non-negative integer. The stored entry
-     * is the normalized "id=number".
+     * Validator for a condition system entry: one line of semicolon separated
+     * key=value fields (region/box, dist, count, ids, acts). The full
+     * validation (region required for region actions, ids required for
+     * dist/count, id normalization) happens in
+     * {@link com.wdylyh.config.ConditionEngine#parse},
+     * which drops invalid lines with a log message, so the command only
+     * rejects empty text. The stored entry keeps the given text.
      */
-    private static String normalize_Limit(String raw) {
-        int eq = raw.indexOf('=');
-
-        if (eq <= 0 || eq >= raw.length() - 1) {
-            return null;
-        }
-
-        String idRaw = raw.substring(0, eq).trim();
-        String numRaw = raw.substring(eq + 1).trim();
-
-        if (idRaw.isEmpty() || numRaw.isEmpty()) {
-            return null;
-        }
-
-        String norm = default_Namespace(idRaw);
-
-        if (!IconGridPicker.matches(IconGridPicker.FKind.ENTITIES, norm) &&
-                !IconGridPicker.matches(IconGridPicker.FKind.PARTICLES, norm)) {
-            return null;
-        }
-
-        int value;
-
-        try {
-            value = Integer.parseInt(numRaw);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-
-        if (value < -1) {
-            return null;
-        }
-
-        return norm + "=" + value;
-    }
-
-    /**
-     * Validator for a coordinate filter entry:
-     * "x,y,z", "x1,y1,z1~x2,y2,z2" or either with optional attached ids after
-     * a semicolon ("x,y,z;id;id"). The stored entry keeps the given text.
-     */
-    private static String normalize_Coord(String raw) {
+    private static String normalize_Condition(String raw) {
         String text = raw.trim();
-
-        if (text.isEmpty()) {
-            return null;
-        }
-
-        String[] semis = text.split(";");
-        String[] corners = semis[0].trim().split("~");
-
-        if (corners.length > 2 || !is_Coord(corners[0])) {
-            return null;
-        }
-
-        if (corners.length == 2 && !is_Coord(corners[1])) {
-            return null;
-        }
-
-        for (int i = 1; i < semis.length; i++) {
-            if (semis[i].trim().isEmpty()) {
-                return null;
-            }
-        }
-
-        return text;
-    }
-
-    /** True when the text is "x,y,z" with three integers. */
-    private static boolean is_Coord(String text) {
-        String[] parts = text.split(",");
-
-        if (parts.length != 3) {
-            return false;
-        }
-
-        for (String number : parts) {
-            if (number.trim().isEmpty()) {
-                return false;
-            }
-
-            try {
-                Integer.parseInt(number.trim());
-            } catch (NumberFormatException e) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Validator for a coordinate aware replacement entry: a coordinate target
-     * ("x,y,z" or "x1,y1,z1~x2,y2,z2") followed by one or more non-empty
-     * "source=target" rules after a semicolon. The rules accept any non-empty
-     * pair (a rule's source decides its render category at match time, the
-     * same way the coordinate filter attached ids do), so unlike the
-     * per-category replacement lists no registry lookup is forced here. The
-     * stored entry keeps the given text.
-     */
-    private static String normalize_Coord_Replace(String raw) {
-        String text = raw.trim();
-
-        if (text.isEmpty()) {
-            return null;
-        }
-
-        String[] semis = text.split(";");
-
-        String[] corners = semis[0].trim().split("~");
-
-        if (corners.length > 2 || !is_Coord(corners[0])) {
-            return null;
-        }
-
-        if (corners.length == 2 && !is_Coord(corners[1])) {
-            return null;
-        }
-
-        for (int i = 1; i < semis.length; i++) {
-            String rule = semis[i].trim();
-            int eq = rule.indexOf('=');
-
-            if (eq <= 0 || eq >= rule.length() - 1) {
-                return null;
-            }
-
-            if (rule.substring(0, eq).trim().isEmpty() || rule.substring(eq + 1).trim().isEmpty()) {
-                return null;
-            }
-        }
-
-        return text;
+        return text.isEmpty() ? null : text;
     }
 
     /** Defaults a missing namespace to "minecraft:", like the config GUI stores ids. */

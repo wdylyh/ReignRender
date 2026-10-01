@@ -90,6 +90,32 @@ public class ReplaceListScreen extends GuiBase
 
             return null;
         }
+
+        /**
+         * The coordinate-rule category key of this kind, matching
+         * {@link com.wdylyh.config.ReplacementEngine#COORD_REPLACE_CATEGORIES}.
+         * Null for HUD elements — they have no coordinate aware query path, so
+         * they are not offered in the condition rule picker.
+         */
+        public String catKey()
+        {
+            return switch (this)
+            {
+                case PARTICLES -> "particles";
+                case BLOCKS -> "blocks";
+                case ENTITIES -> "entities";
+                case FOGS -> "fog";
+                case ARMOR -> "armor";
+                case FLUIDS -> "fluids";
+                case BLOCK_ENTITIES -> "blockEntities";
+                case FALLING_BLOCKS -> "fallingBlocks";
+                case ITEM_ENTITIES -> "itemEntities";
+                case HELD_ITEMS -> "heldItems";
+                case NAME_TAGS -> "nameTags";
+                case PLAYER_NAMES -> "playerNames";
+                case HUD_ELEMENTS -> null;
+            };
+        }
     }
 
     private final ReplaceKind replaceKind;

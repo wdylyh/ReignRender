@@ -311,6 +311,22 @@ public class FaceModEditorScreen extends GuiBase
             return mod;
         }
 
+        // Region categories with no edit of their own seed the canvas from the
+        // GLOBAL face-mod edit of the same vanilla texture (drawn there first,
+        // then carried over by a single save here — the two edit stores are
+        // independent, so this is the only bridge between them).
+        if (this.kind.isRegion())
+        {
+            String globalKey = globalIndexKey(this.kind);
+
+            if (globalKey != null
+                    && FaceModIndex.overriddenPaths(globalKey, this.id).contains(this.texturePath)
+                    && (mod = FaceModPacks.readModified(this.texturePath)) != null)
+            {
+                return mod;
+            }
+        }
+
         try (InputStream in = MinecraftClient.getInstance().getResourceManager()
                 .getResourceOrThrow(Identifier.of(this.texturePath)).getInputStream())
         {
@@ -322,6 +338,22 @@ public class FaceModEditorScreen extends GuiBase
                     this.texturePath, e);
             return new NativeImage(16, 16, false);
         }
+    }
+
+    /**
+     * The global {@link FaceModIndex} category key of a region kind, or null.
+     * The keys match except for the items (region ITEMS vs global ITEM_ENTITIES).
+     */
+    private static String globalIndexKey(FaceModListScreen.FaceKind kind)
+    {
+        return switch (kind)
+        {
+            case R_BLOCKS -> "BLOCKS";
+            case R_ENTITIES -> "ENTITIES";
+            case R_PARTICLES -> "PARTICLES";
+            case R_ITEMS -> "ITEM_ENTITIES";
+            default -> null;
+        };
     }
 
     /** Nearest neighbor copy of src onto the whole dst canvas. */
@@ -526,7 +558,10 @@ public class FaceModEditorScreen extends GuiBase
             FaceModPacks.saveTexture(this.savePath, this.img);
         }
 
-        this.error = StringUtils.translate("reignrender.gui.face.saved");
+        // Name the destination pack in the confirmation: a save through the
+        // wrong category (region vs global) is instantly recognizable.
+        this.error = StringUtils.translate(this.kind.isRegion()
+                ? "reignrender.gui.face.saved.region" : "reignrender.gui.face.saved.global");
         this.rebuild();
     }
 
@@ -675,6 +710,14 @@ public class FaceModEditorScreen extends GuiBase
                 FileInputStream in = new FileInputStream(sel);
                 MinecraftClient.getInstance().execute(() ->
                 {
+                    // The dialog thread outlives the screen: removed() has
+                    // nulled the canvas when the user closed the editor while
+                    // the dialog was open — drop the import instead of NPEing.
+                    if (this.img == null || this.tex == null)
+                    {
+                        return;
+                    }
+
                     try (in)
                     {
                         this.applyImport(in, sel.getAbsolutePath());

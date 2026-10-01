@@ -2,6 +2,7 @@ package com.wdylyh.mixin;
 
 import com.wdylyh.api.ParticlePickAccessor;
 import com.wdylyh.config.RenderConfig;
+import com.wdylyh.config.ConditionEngine;
 import com.wdylyh.config.CoordinateFilter;
 import com.wdylyh.config.FilterEngine;
 import com.wdylyh.config.ReplacementEngine;
@@ -64,23 +65,21 @@ public abstract class ParticleFilter implements ParticlePickAccessor {
         loc[0] = x;
         loc[1] = y;
         loc[2] = z;
-        // Per-id count/distance limits are independent of both the particle
-        // filter toggle and the coordinate filter, so they are checked before
-        // the fast path below (which would otherwise skip them entirely). The
-        // count limit shares the per-frame budget with the entities; the
-        // distance limit compares the spawn position against the camera.
-        if (RenderConfig.Hotkeys.TOGGLE_COUNT_LIMITS.getBooleanValue() &&
-                FilterEngine.countLimitExceeded(FilterEngine.getParticleId(fx.getType()))) {
+        // Per-id count/distance limits from the condition system are
+        // independent of both the particle filter toggle and the coordinate
+        // filter, so they are checked before the fast path below (which would
+        // otherwise skip them entirely). The count limit shares the per-frame
+        // budget with the entities; the distance limit compares the spawn
+        // position against the camera.
+        String limitId = FilterEngine.getParticleId(fx.getType());
+        if (ConditionEngine.isCountExceeded(limitId, x, y, z)) {
             cir.cancel();
             return;
         }
-        if (RenderConfig.Hotkeys.TOGGLE_DISTANCE_LIMITS.getBooleanValue()) {
-            Vec3d cp = MinecraftClient.getInstance().gameRenderer.getCamera().getCameraPos();
-            if (FilterEngine.distanceLimitExceeded(FilterEngine.getParticleId(fx.getType()),
-                    x, y, z, cp.x, cp.y, cp.z)) {
-                cir.cancel();
-                return;
-            }
+        Vec3d cp = MinecraftClient.getInstance().gameRenderer.getCamera().getCameraPos();
+        if (ConditionEngine.isDistanceExceeded(limitId, x, y, z, cp.x, cp.y, cp.z)) {
+            cir.cancel();
+            return;
         }
         // Fast path: with both the filter toggle and the coordinate filter off
         // there is nothing to decide, so the native GLFW keyboard query (the
@@ -168,7 +167,10 @@ public abstract class ParticleFilter implements ParticlePickAccessor {
             replacementInitialized = true;
             REPLACEMENT_LOGGER.info("[ReignRender] particle replace ready: enabled={}, rules={}", ReplacementEngine.isReplaceEnabled(), ReplacementEngine.particleRuleCount());
         }
-        if (!ReplacementEngine.isReplaceEnabled() || fx == null) {
+        // No master-switch gate: the coordinate rules below are gated by the
+        // coordinate replace toggle (global switch OFF), the global fallback
+        // checks the master switch internally.
+        if (fx == null) {
             return fx;
         }
         // The reveal hotkey skips the replacement (shows the original particle).
@@ -179,7 +181,7 @@ public abstract class ParticleFilter implements ParticlePickAccessor {
         // Coordinate aware rules win over the global list; the spawn position
         // was stashed by the 7-arg HEAD handler above.
         double[] loc = particleSpawnLocation.get();
-        String tid = ReplacementEngine.getReplacementParticleAt(src, loc[0], loc[1], loc[2]);
+        String tid = ReplacementEngine.getReplacementParticleAt(src, loc[0], loc[1], loc[2], FilterEngine.TYPE_PARTICLES);
         if (tid == null) {
             tid = ReplacementEngine.getReplacementParticle(src);
         }
@@ -224,14 +226,17 @@ public abstract class ParticleFilter implements ParticlePickAccessor {
         // at the same position (the dust's random sprinkle velocity is not
         // worth replicating, zero is fine). The spawned particle takes the
         // 7-arg path, so the filter logic still applies to it.
-        if (p instanceof BlockDustParticle && ReplacementEngine.isReplaceEnabled()) {
+        // No master-switch gate: the coordinate rules below are gated by the
+        // coordinate replace toggle (global switch OFF), the global fallback
+        // checks the master switch internally.
+        if (p instanceof BlockDustParticle) {
             String src = FilterEngine.getParticleId(ParticleTypes.BLOCK);
             if (FilterEngine.isReplaceBlocked(FilterEngine.TYPE_PARTICLES)) {
                 return;
             }
             Vec3d c = p.getBoundingBox().getCenter();
             // Coordinate aware rules win over the global list.
-            String tid = ReplacementEngine.getReplacementParticleAt(src, c.x, c.y, c.z);
+            String tid = ReplacementEngine.getReplacementParticleAt(src, c.x, c.y, c.z, FilterEngine.TYPE_PARTICLES);
             if (tid == null) {
                 tid = ReplacementEngine.getReplacementParticle(src);
             }
@@ -252,23 +257,20 @@ public abstract class ParticleFilter implements ParticlePickAccessor {
             }
         }
 
-        // Per-id count/distance limits, checked before the fast path below
-        // for the same independence reason as in the 7-arg overload. Only the
-        // block break particles have a known type here ("minecraft:block"),
-        // directly constructed particles of unknown types are skipped by both
-        // limits.
-        if (RenderConfig.Hotkeys.TOGGLE_COUNT_LIMITS.getBooleanValue() &&
-                p instanceof BlockDustParticle &&
-                FilterEngine.countLimitExceeded(FilterEngine.getParticleId(ParticleTypes.BLOCK))) {
-            ci.cancel();
-            return;
-        }
-        if (RenderConfig.Hotkeys.TOGGLE_DISTANCE_LIMITS.getBooleanValue() &&
-                p instanceof BlockDustParticle) {
-            Vec3d cp = MinecraftClient.getInstance().gameRenderer.getCamera().getCameraPos();
+        // Per-id count/distance limits from the condition system, checked
+        // before the fast path below for the same independence reason as in
+        // the 7-arg overload. Only the block break particles have a known type
+        // here ("minecraft:block"), directly constructed particles of unknown
+        // types are skipped by both limits.
+        if (p instanceof BlockDustParticle) {
+            String limitId = FilterEngine.getParticleId(ParticleTypes.BLOCK);
             Vec3d c = p.getBoundingBox().getCenter();
-            if (FilterEngine.distanceLimitExceeded(FilterEngine.getParticleId(ParticleTypes.BLOCK),
-                    c.x, c.y, c.z, cp.x, cp.y, cp.z)) {
+            if (ConditionEngine.isCountExceeded(limitId, c.x, c.y, c.z)) {
+                ci.cancel();
+                return;
+            }
+            Vec3d cp = MinecraftClient.getInstance().gameRenderer.getCamera().getCameraPos();
+            if (ConditionEngine.isDistanceExceeded(limitId, c.x, c.y, c.z, cp.x, cp.y, cp.z)) {
                 ci.cancel();
                 return;
             }

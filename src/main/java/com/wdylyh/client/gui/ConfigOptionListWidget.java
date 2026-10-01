@@ -33,8 +33,7 @@ public class ConfigOptionListWidget extends WidgetListConfigOptions
 
             if (config instanceof IConfigStringList cfg
                     && cfg != RenderConfig.General.REVEAL_AFFECTED_TYPES
-                    && cfg != RenderConfig.Filters.COORD_ENTRIES
-                    && cfg != RenderConfig.Filters.COORD_REPLACE_ENTRIES)
+                    && cfg != RenderConfig.Conditions.CONDITION_ENTRIES)
             {
                 return FIELD_ROW_HEIGHT;
             }

@@ -64,7 +64,10 @@ public class ArmorFilterReplace {
     @ModifyVariable(method = "renderArmor(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/EquipmentSlot;ILnet/minecraft/client/render/entity/state/BipedEntityRenderState;)V",
             at = @At("HEAD"), argsOnly = true, index = 3)
     private ItemStack repStack(ItemStack stk) {
-        if (!ReplacementEngine.isReplaceEnabled() || stk == null || stk.isEmpty()) {
+        // No master-switch gate: the coordinate rules below are gated by the
+        // coordinate replace toggle (global switch OFF), the global fallback
+        // checks the master switch internally.
+        if (stk == null || stk.isEmpty()) {
             return stk;
         }
         // The reveal hotkey skips the replacement (shows the original armor).
@@ -73,7 +76,7 @@ public class ArmorFilterReplace {
         }
         Item srcI = stk.getItem();
         double[] pos = ARMOR_POS.get();
-        String tId = ReplacementEngine.getReplacementArmorAt(FilterEngine.getItemId(srcI), pos[0], pos[1], pos[2]);
+        String tId = ReplacementEngine.getReplacementArmorAt(FilterEngine.getItemId(srcI), pos[0], pos[1], pos[2], FilterEngine.TYPE_ARMOR);
         if (tId == null) {
             tId = ReplacementEngine.getReplacementArmor(FilterEngine.getItemId(srcI));
         }

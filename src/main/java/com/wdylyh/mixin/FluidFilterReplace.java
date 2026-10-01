@@ -45,7 +45,10 @@ public class FluidFilterReplace {
     }
     @ModifyVariable(method = "renderFluid", at = @At("HEAD"), argsOnly = true, index = 5)
     private FluidState rplFluid(FluidState fs) {
-        if (!ReplacementEngine.isReplaceEnabled() || fs == null || fs.isEmpty()) {
+        // No master-switch gate: the coordinate rules below are gated by the
+        // coordinate replace toggle (global switch OFF), the global fallback
+        // checks the master switch internally.
+        if (fs == null || fs.isEmpty()) {
             return fs;
         }
         boolean kd = FilterEngine.revealDown();
@@ -58,7 +61,7 @@ public class FluidFilterReplace {
         String tid = null;
         BlockPos p = FLUID_POS.get();
         if (p != null) {
-            tid = ReplacementEngine.getReplacementFluidAt(src, p.getX(), p.getY(), p.getZ());
+            tid = ReplacementEngine.getReplacementFluidAt(src, p.getX(), p.getY(), p.getZ(), FilterEngine.TYPE_FLUIDS);
         }
         if (tid == null) {
             tid = ReplacementEngine.getReplacementFluid(src);

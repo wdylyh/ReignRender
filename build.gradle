@@ -4,10 +4,13 @@ plugins {
 }
 
 repositories {
-	// 聚合镜像：代理 Mojang 库、Fabric 仓库和 Maven Central 通用依赖
+	// Fabric 官方仓库
 	maven {
-		name = "Lss233-Minecraft"
-		url = "https://lss233.littleservice.cn/repositories/minecraft/"
+		url = 'https://maven.fabricmc.net/'
+	}
+	// Minecraft 官方库（com.mojang:xxx 必须走这里）
+	maven {
+		url = 'https://libraries.minecraft.net/'
 	}
 	// MaLiLib 专用仓库
 	maven {
@@ -17,6 +20,10 @@ repositories {
 	// FallenBreath 仓库
 	maven {
 		url = 'https://maven.fallenbreath.me/releases'
+	}
+	// 阿里云镜像（通用加速）
+	maven {
+		url = 'https://maven.aliyun.com/repository/public/'
 	}
 	// 通用后备仓库
 	mavenCentral()

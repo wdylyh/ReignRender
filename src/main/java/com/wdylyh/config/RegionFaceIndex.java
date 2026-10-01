@@ -180,6 +180,29 @@ public class RegionFaceIndex {
         return out;
     }
 
+    /** All object ids of the category that carry at least one modified texture, sorted. */
+    public static List<String> idsWithOverrides(String category) {
+        checkLoaded();
+
+        Map<String, Set<String>> ids = INDEX.get(category);
+
+        if (ids == null) {
+            return Collections.emptyList();
+        }
+
+        List<String> out = new ArrayList<>();
+
+        for (Map.Entry<String, Set<String>> e : ids.entrySet()) {
+            if (!e.getValue().isEmpty()) {
+                out.add(e.getKey());
+            }
+        }
+
+        Collections.sort(out);
+
+        return out;
+    }
+
     /** Records one modified texture and persists the index. */
     public static void addOverride(String category, String objectId, String texturePath) {
         checkLoaded();

@@ -87,6 +87,17 @@ public class RegionFacePacks {
      * resources of the currently listed ids.
      */
     public static void applyEnabled(boolean enabled) {
+        applyEnabled(enabled, true);
+    }
+
+    /**
+     * Applies the pack state. When {@code allowReload} is false (the startup
+     * bootstrap) a state change still happens, but a reload is only skipped —
+     * the game's own initial resource load picks the new pack state up. A run
+     * where the pack is already in the desired state does nothing at all, so
+     * starting the game never triggers a redundant reload.
+     */
+    public static void applyEnabled(boolean enabled, boolean allowReload) {
         MinecraftClient mc = MinecraftClient.getInstance();
 
         if (mc == null) {
@@ -96,7 +107,10 @@ public class RegionFacePacks {
         if (!enabled || !RegionFaceEngine.active()) {
             if (isEnabled()) {
                 disablePack();
-                reloadResources();
+
+                if (allowReload) {
+                    reloadResources();
+                }
             }
 
             return;
@@ -109,7 +123,10 @@ public class RegionFacePacks {
         if (!RegionFaceIndex.hasAnyOverrides()) {
             if (isEnabled()) {
                 disablePack();
-                reloadResources();
+
+                if (allowReload) {
+                    reloadResources();
+                }
             }
 
             return;
@@ -117,7 +134,7 @@ public class RegionFacePacks {
 
         ensureResources();
         ensurePack();
-        enablePackAndReload();
+        enablePack(allowReload);
     }
 
     /**
@@ -148,6 +165,46 @@ public class RegionFacePacks {
         return id != null && mc.getResourcePackManager().getEnabledIds().contains(id);
     }
 
+    /**
+     * Ensures the pack is among the enabled resource packs (persisting the
+     * state to options.txt). A reload only happens when the pack actually had
+     * to be enabled and {@code allowReload} holds — an already enabled pack's
+     * loaded resources already contain everything, so re-enabling runs (e.g.
+     * the startup bootstrap) are no-ops instead of redundant reloads.
+     */
+    private static void enablePack(boolean allowReload) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+
+        if (mc == null) {
+            return;
+        }
+
+        ResourcePackManager manager = mc.getResourcePackManager();
+        manager.scanPacks();
+
+        String id = packId(manager);
+
+        if (id == null) {
+            LOGGER.warn("[ReignRender] the region face-mod resource pack was not discovered by the game");
+            return;
+        }
+
+        if (!manager.getEnabledIds().contains(id)) {
+            manager.enable(id);
+            mc.options.refreshResourcePacks(manager);
+
+            if (allowReload) {
+                reloadResources();
+            }
+        }
+    }
+
+    /**
+     * Enables the pack if needed and always reloads: only the saveTexture
+     * path uses this, where a texture file was just (re)written and even an
+     * already enabled pack needs the reload to stitch the new content into
+     * the atlas.
+     */
     private static void enablePackAndReload() {
         MinecraftClient mc = MinecraftClient.getInstance();
 
@@ -308,15 +365,18 @@ public class RegionFacePacks {
     }
 
     /**
-     * Generates the block and item shadow resources for the ids of the current
-     * region entries. Entities and particles need no generated resources (they
-     * are pure texture swaps). Idempotent.
+     * Generates the shadow resources for every id that carries region edits.
      *
-     * <p>Only ids that actually have edited textures are generated for — a
-     * listed id without edits renders nothing region-modified anyway (the
-     * render hooks check the index), so generating its resources would only
-     * produce new pack files and trigger needless reloads. Returns true when
-     * any new resource file was written (i.e. a reload could be needed).</p>
+     * <p>The shadow creation is driven purely by the edit index, NOT by the
+     * region entries: an edited id always gets its shadow resources (the
+     * blockstate / models / default texture copies), whether or not it is
+     * currently attached to a region entry. The region entries decide at
+     * render time where the shadows are referenced — inside a region the
+     * shadow renders, outside it the vanilla id renders.</p>
+     *
+     * <p>Entities and particles need no generated resources (pure texture
+     * swaps). Idempotent. Returns true when any new resource file was written
+     * (i.e. a reload could be needed).</p>
      */
     public static boolean ensureResources() {
         MinecraftClient mc = MinecraftClient.getInstance();
@@ -327,14 +387,12 @@ public class RegionFacePacks {
 
         boolean changed = false;
 
-        for (RegionFaceEngine.Id id : RegionFaceEngine.listedIds()) {
-            if (id.block() && RegionFaceIndex.hasOverrides(RegionFaceIndex.BLOCKS, id.id())) {
-                changed |= ensureRegionBlockResources(mc.getResourceManager(), id.id());
-            }
+        for (String blockId : RegionFaceIndex.idsWithOverrides(RegionFaceIndex.BLOCKS)) {
+            changed |= ensureRegionBlockResources(mc.getResourceManager(), blockId);
+        }
 
-            if (id.item() && RegionFaceIndex.hasOverrides(RegionFaceIndex.ITEMS, id.id())) {
-                changed |= ensureRegionItemModel(mc.getResourceManager(), id.id());
-            }
+        for (String itemId : RegionFaceIndex.idsWithOverrides(RegionFaceIndex.ITEMS)) {
+            changed |= ensureRegionItemModel(mc.getResourceManager(), itemId);
         }
 
         return changed;
@@ -781,16 +839,12 @@ public class RegionFacePacks {
         return s.contains(":") ? s : "minecraft:" + s;
     }
 
-    /** The region item shadow model identifiers needed by the current region entries. */
+    /** The region item shadow model identifiers of every item id with region edits. */
     public static List<Identifier> regionItemModelIds() {
         List<Identifier> ids = new ArrayList<>();
 
-        for (RegionFaceEngine.Id id : RegionFaceEngine.listedIds()) {
-            if (!id.item()) {
-                continue;
-            }
-
-            Identifier mid = regionItemModelId(id.id());
+        for (String itemId : RegionFaceIndex.idsWithOverrides(RegionFaceIndex.ITEMS)) {
+            Identifier mid = regionItemModelId(itemId);
 
             if (mid != null) {
                 ids.add(mid);
@@ -867,7 +921,18 @@ public class RegionFacePacks {
         }
 
         ensureResources();
-        enablePackAndReload();
+
+        // Saving an edit must not force-enable the pack while the region
+        // face-mod is inactive (region switch off, or the global face-mod is
+        // on — mutual exclusion): the shadow resources only ever render where
+        // a region entry matches, and an enabled pack with an inactive engine
+        // would just waste memory. With the engine inactive the edit is only
+        // written to disk and applies once the engine becomes active.
+        if (RegionFaceEngine.active()) {
+            enablePackAndReload();
+        } else {
+            applyEnabled(false);
+        }
     }
 
     /**
@@ -951,11 +1016,32 @@ public class RegionFacePacks {
         }
 
         try {
-            // Read the ORIGINAL (lowest-priority resource): the face-mod pack
-            // overrides vanilla paths, and a copy taken from that override
-            // would bake the global block edit into the region copy.
+            // Read the ORIGINAL texture, not any mod-generated override: the
+            // global face-mod pack (ReignRender_FaceMod) overrides vanilla
+            // texture paths and this pack carries the rface copies, so both
+            // are skipped. Resources are scanned from the TAIL (highest
+            // priority first) and the first non-mod resource is the true
+            // original a shadow copy must start from.
             java.util.List<Resource> all = rm.getAllResources(vanillaTex);
-            NativeImage img = NativeImage.read(all.get(all.size() - 1).getInputStream());
+            Resource original = null;
+
+            for (int i = all.size() - 1; i >= 0; i--) {
+                String pid = all.get(i).getPackId();
+
+                if (pid.contains("ReignRender_FaceMod") || pid.contains("ReignRender_RegionFace")) {
+                    continue;
+                }
+
+                original = all.get(i);
+                break;
+            }
+
+            if (original == null) {
+                LOGGER.warn("[ReignRender] no original resource found for the region texture {}", vanillaTex);
+                return false;
+            }
+
+            NativeImage img = NativeImage.read(original.getInputStream());
 
             try {
                 Files.createDirectories(target.getParent());

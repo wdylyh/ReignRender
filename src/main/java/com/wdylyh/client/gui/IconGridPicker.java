@@ -371,7 +371,17 @@ public class IconGridPicker extends GuiBase
             case FOGS ->
             {
                 ClientWorld w = MinecraftClient.getInstance().world;
-                yield w != null && w.getRegistryManager().getOrThrow(RegistryKeys.BIOME).containsId(i);
+
+                if (w != null)
+                {
+                    yield w.getRegistryManager().getOrThrow(RegistryKeys.BIOME).containsId(i);
+                }
+
+                // Main menu: the world (and its biome registry) is not loaded
+                // yet, so a perfectly valid biome id would be rejected here.
+                // Fall back to accepting any well-formed id — the fog engine
+                // resolves it against the registry once a world is loaded.
+                yield true;
             }
 
             case HUD -> false;
