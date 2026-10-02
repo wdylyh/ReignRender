@@ -66,7 +66,8 @@ public class FallingBlockReplace {
         // No master-switch gate: the coordinate rules below are gated by the
         // coordinate replace toggle (global switch OFF), the global fallback
         // checks the master switch internally.
-        if (!FilterEngine.isReplaceBlocked(FilterEngine.TYPE_FALLING_BLOCKS)) {
+        if (!FilterEngine.isReplaceBlocked(FilterEngine.TYPE_FALLING_BLOCKS)
+                && ReplacementEngine.anyReplaceActive()) {
             // 坐标规则优先于全局列表：以下落方块当前位置落点为准。
             String tid = ReplacementEngine.getReplacementFallingBlockAt(sid, ent.getX(), ent.getY(), ent.getZ(), FilterEngine.TYPE_FALLING_BLOCKS);
             if (tid == null) {

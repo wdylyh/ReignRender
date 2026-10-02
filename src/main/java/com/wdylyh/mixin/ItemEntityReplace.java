@@ -66,7 +66,7 @@ public class ItemEntityReplace {
         // No master-switch gate: the coordinate rules below are gated by the
         // coordinate replace toggle (global switch OFF), the global fallback
         // checks the master switch internally.
-        if (stack.isEmpty()) {
+        if (stack.isEmpty() || !ReplacementEngine.anyReplaceActive()) {
             return stack;
         }
         // The reveal hotkey skips the replacement (shows the original drop),

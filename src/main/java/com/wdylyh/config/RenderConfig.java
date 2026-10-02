@@ -189,6 +189,7 @@ public class RenderConfig implements IConfigHandler {
                 Filters.FOG_MODE,
                 Filters.NAME_TAG_MODE,
                 Filters.PLAYER_MODE,
+                Filters.HUD_MODE,
                 // 坐标选取
                 COORD_PICK_MODE,
                 // 解除热键
@@ -329,6 +330,14 @@ public class RenderConfig implements IConfigHandler {
                 "nameTagMode", MODE_OFF, ImmutableList.of(MODE_OFF, MODE_BLACKLIST, MODE_WHITELIST)).apply(F_KEY);
         public static final ConfigOptionValues<BaseOptionListConfigValue> PLAYER_MODE = new ConfigOptionValues<>(
                 "playerMode", MODE_OFF, ImmutableList.of(MODE_OFF, MODE_BLACKLIST, MODE_WHITELIST)).apply(F_KEY);
+
+        /**
+         * HUD 元素过滤模式。黑名单：隐藏列表中的元素；白名单：仅显示列表中
+         * 的元素；关闭：隐藏全部 HUD 元素。主开关
+         * {@link RenderConfig.Toggles#DISABLE_HUD_ELEMENTS} 仍是总开关。
+         */
+        public static final ConfigOptionValues<BaseOptionListConfigValue> HUD_MODE = new ConfigOptionValues<>(
+                "hudMode", MODE_BLACKLIST, ImmutableList.of(MODE_OFF, MODE_BLACKLIST, MODE_WHITELIST)).apply(F_KEY);
 
         public static final ConfigStringList FILTERED_ENTITIES = new ConfigStringList("filteredEntities", ImmutableList.of()).apply(F_KEY);
         public static final ConfigStringList FILTERED_BLOCKS = new ConfigStringList("filteredBlocks", ImmutableList.of()).apply(F_KEY);

@@ -30,6 +30,7 @@ public class HudElementFilter {
     /** Guards against re-entrant replacement while the target element renders. */
     private static boolean rendering;
 
+
     /**
      * Returns true when the given HUD element id should be hidden: the master
      * "Disable HUD Elements" toggle must be on AND the id must appear in the

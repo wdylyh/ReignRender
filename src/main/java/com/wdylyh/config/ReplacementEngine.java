@@ -103,9 +103,28 @@ public class ReplacementEngine {
      * master switch must be OFF — the regional mechanism only applies while
      * the global one is off (they are mutually exclusive: with the global
      * replacement enabled the region rules step aside entirely).
+     * <p>
+     * Public so per-section callers (SectionBuilder baking) can evaluate it
+     * once per section instead of once per block.
      */
-    private static boolean coordReplaceActive() {
+    public static boolean isCoordReplaceActive() {
         return !isReplaceEnabled() && RenderConfig.Hotkeys.TOGGLE_COORD_REPLACE.getBooleanValue();
+    }
+
+    private static boolean coordReplaceActive() {
+        return isCoordReplaceActive();
+    }
+
+    /**
+     * True when ANY replacement mechanism is active (the global master switch
+     * or the coordinate replacement toggle). Per-object callers (entity
+     * dispatch, particle spawn, item drops, armor, ...) use this once per
+     * object to skip the whole replacement chain — the {@code isReplaceBlocked}
+     * check and the {@code getReplacement*At / getReplacement*} pair — when
+     * no replacement can possibly match.
+     */
+    public static boolean anyReplaceActive() {
+        return isReplaceEnabled() || isCoordReplaceActive();
     }
 
     private static void rebuild() {

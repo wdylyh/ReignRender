@@ -85,21 +85,36 @@ public class EntityRenderFilter {
         }
 
         // Per-id render count/distance limits from the condition system,
-        // gated by their own master switches and independent of the
-        // per-category filters (they apply even when the entity filter is
-        // off). The count limit consumes one unit of the per-frame budget;
-        // the distance limit compares the entity position against the camera
-        // position (the cx/cy/cz arguments of shouldRender). Item drops are
-        // matched by their item id (the entity id of every ItemEntity is the
-        // same "minecraft:item", so only the item id is meaningful).
-        String limitId = e instanceof ItemEntity ie && ie.getStack() != null && !ie.getStack().isEmpty()
-                ? FilterEngine.getItemId(ie.getStack().getItem())
-                : FilterEngine.getEntityId(e.getType());
-        if (ConditionEngine.isCountExceeded(limitId, e.getX(), e.getY(), e.getZ())) {
+        // gated by their own master switches and by the NORMAL hotkey
+        // behavior of the entity's own reveal category (item drops and
+        // falling blocks have their own categories): while the category is
+        // suspended (BYPASS = release mode reveal hotkey held, INACTIVE =
+        // enable mode with the hotkey up) the world must render as-is, so
+        // the limits step aside exactly like the hide filters do. The count
+        // limit consumes one unit of the per-frame budget; the distance
+        // limit compares the entity position against the camera position
+        // (the cx/cy/cz arguments of shouldRender). Item drops are matched
+        // by their item id (the entity id of every ItemEntity is the same
+        // "minecraft:item", so only the item id is meaningful).
+        String limitId = null;
+        if (ConditionEngine.limitsActive()) {
+            int limitBhv = bhv;
+            if (e instanceof FallingBlockEntity) {
+                limitBhv = FilterEngine.hotkey_Behavior(FilterEngine.TYPE_FALLING_BLOCKS, kd);
+            } else if (e instanceof ItemEntity) {
+                limitBhv = FilterEngine.hotkey_Behavior(FilterEngine.TYPE_ITEM_ENTITIES, kd);
+            }
+            if (limitBhv == FilterEngine.HOTKEY_BEHAVIOR_NORMAL) {
+                limitId = e instanceof ItemEntity ie && ie.getStack() != null && !ie.getStack().isEmpty()
+                        ? FilterEngine.getItemId(ie.getStack().getItem())
+                        : FilterEngine.getEntityId(e.getType());
+            }
+        }
+        if (limitId != null && ConditionEngine.isCountExceeded(limitId, e.getX(), e.getY(), e.getZ())) {
             cbr.setReturnValue(false);
             return;
         }
-        if (ConditionEngine.isDistanceExceeded(limitId,
+        if (limitId != null && ConditionEngine.isDistanceExceeded(limitId,
                 e.getX(), e.getY(), e.getZ(), cx, cy, cz)) {
             cbr.setReturnValue(false);
             return;
@@ -201,7 +216,9 @@ public class EntityRenderFilter {
         // the coordinate replace toggle (global switch OFF) while the global
         // fallback checks the master switch internally — an outer gate would
         // make the two mutually exclusive paths impossible to combine.
-        if (e == null) {
+        if (e == null || !ReplacementEngine.anyReplaceActive()) {
+            // No replacement mechanism is active: nothing below can match, so
+            // skip the per-entity reveal check and the replacement id lookups.
             return e;
         }
         // The reveal hotkey skips the replacement (shows the original entity).

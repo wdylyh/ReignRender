@@ -101,6 +101,17 @@ public class ConditionEngine {
     private static volatile boolean dirty = true;
     private static volatile Cond[] entries = new Cond[0];
 
+    // Per-id buckets of entry indices, rebuilt together with the entries. The
+    // per-block dist/count queries (SectionBuilder baking) used to linear-scan
+    // the whole entries array with a per-entry idMatches string compare; the
+    // buckets turn that into a single map lookup + a short per-id list scan.
+    // The lists keep config order (first matching entry decides) and hold the
+    // original entry indices, so the count budgets keyed by index stay valid.
+    private static volatile Map<String, int[]> dist_Buckets = Map.of();
+    private static volatile Map<String, int[]> count_Buckets = Map.of();
+    /** True when at least one parsed entry carries a dist or count limit. */
+    private static volatile boolean hasLimits = false;
+
     // Serialized view lines for the existing engines, rebuilt together with
     // the entries.
     private static volatile List<String> coordFilterView = List.of();
@@ -185,6 +196,7 @@ public class ConditionEngine {
                     coordFilterView = List.copyOf(cf);
                     coordReplaceView = List.copyOf(cr);
                     regionFaceView = List.copyOf(rf);
+                    rebuildBuckets(parsed);
                     frameCounts.clear();
                     dirty = false;
                 }
@@ -257,6 +269,73 @@ public class ConditionEngine {
     }
 
     /**
+     * Builds the per-id dist/count buckets from the parsed entries. Every
+     * entry carrying the respective limit is bucketed regardless of the
+     * toggle state: the query methods re-check the toggles on every call, so
+     * toggling TOGGLE_DISTANCE_LIMITS / TOGGLE_COUNT_LIMITS on or off takes
+     * effect immediately without needing a rebuild (these two toggles have
+     * no registered change callback). An empty bucket map still means the
+     * query methods return after one map lookup.
+     */
+    private static void rebuildBuckets(List<Cond> parsed) {
+        boolean limits = false;
+        Map<String, List<Integer>> dist = new HashMap<>();
+        Map<String, List<Integer>> count = new HashMap<>();
+
+        for (int i = 0; i < parsed.size(); i++) {
+            Cond e = parsed.get(i);
+            if (e.dist >= 0) {
+                limits = true;
+                for (String id : e.ids) {
+                    dist.computeIfAbsent(id, k -> new ArrayList<>()).add(i);
+                }
+            }
+            if (e.count >= 0) {
+                limits = true;
+                for (String id : e.ids) {
+                    count.computeIfAbsent(id, k -> new ArrayList<>()).add(i);
+                }
+            }
+        }
+
+        hasLimits = limits;
+        dist_Buckets = freezeBuckets(dist);
+        count_Buckets = freezeBuckets(count);
+    }
+
+    private static Map<String, int[]> freezeBuckets(Map<String, List<Integer>> buckets) {
+        if (buckets.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, int[]> out = new HashMap<>(buckets.size() * 2);
+        for (Map.Entry<String, List<Integer>> e : buckets.entrySet()) {
+            List<Integer> list = e.getValue();
+            int[] arr = new int[list.size()];
+            for (int i = 0; i < arr.length; i++) {
+                arr[i] = list.get(i);
+            }
+            out.put(e.getKey(), arr);
+        }
+        return Map.copyOf(out);
+    }
+
+    /**
+     * True when at least one parsed condition entry carries a distance or
+     * count limit AND its toggle is on. Per-section / per-frame callers
+     * (SectionBuilder baking, entity and particle dispatch) use this once per
+     * section or frame to skip the per-object limit queries entirely instead
+     * of re-checking the toggles for every block / entity / particle.
+     */
+    public static boolean limitsActive() {
+        if (!RenderConfig.Hotkeys.TOGGLE_DISTANCE_LIMITS.getBooleanValue()
+                && !RenderConfig.Hotkeys.TOGGLE_COUNT_LIMITS.getBooleanValue()) {
+            return false;
+        }
+        rebuild();
+        return hasLimits;
+    }
+
+    /**
      * True when the object with the given id at (x, y, z) is farther from the
      * camera (cx, cy, cz) than a matching distance entry allows. The first
      * matching entry (config order = priority) decides.
@@ -267,10 +346,12 @@ public class ConditionEngine {
             return false;
         }
         rebuild();
-        for (Cond e : entries) {
-            if (e.dist < 0 || !idMatches(e, id)) {
-                continue;
-            }
+        int[] bucket = dist_Buckets.get(id);
+        if (bucket == null) {
+            return false;
+        }
+        for (int idx : bucket) {
+            Cond e = entries[idx];
             if (e.box != null && !inBox(e.box, x, y, z)) {
                 continue;
             }
@@ -303,15 +384,16 @@ public class ConditionEngine {
             return false;
         }
         rebuild();
-        for (int i = 0; i < entries.length; i++) {
-            Cond e = entries[i];
-            if (e.count < 0 || !idMatches(e, id)) {
-                continue;
-            }
+        int[] bucket = count_Buckets.get(id);
+        if (bucket == null) {
+            return false;
+        }
+        for (int idx : bucket) {
+            Cond e = entries[idx];
             if (e.box != null && !inBox(e.box, x, y, z)) {
                 continue;
             }
-            return frameCounts.merge(i, 1, Integer::sum) > e.count;
+            return frameCounts.merge(idx, 1, Integer::sum) > e.count;
         }
         return false;
     }
@@ -326,18 +408,19 @@ public class ConditionEngine {
             return false;
         }
         rebuild();
+        int[] bucket = count_Buckets.get(id);
+        if (bucket == null) {
+            return false;
+        }
         HashMap<Integer, Integer> used = sectionCounts.get();
-        for (int i = 0; i < entries.length; i++) {
-            Cond e = entries[i];
-            if (e.count < 0 || !idMatches(e, id)) {
-                continue;
-            }
+        for (int idx : bucket) {
+            Cond e = entries[idx];
             if (e.box != null && !inBox(e.box, x, y, z)) {
                 continue;
             }
-            Integer prev = used.get(i);
+            Integer prev = used.get(idx);
             int next = (prev == null ? 0 : prev) + 1;
-            used.put(i, next);
+            used.put(idx, next);
             return next > e.count;
         }
         return false;
@@ -489,16 +572,6 @@ public class ConditionEngine {
             return id.toString();
         }
         return t;
-    }
-
-    /** Text match of the object id against the entry's ids. */
-    private static boolean idMatches(Cond e, String id) {
-        for (String s : e.ids) {
-            if (s.equals(id)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static boolean inBox(int[] b, double x, double y, double z) {

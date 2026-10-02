@@ -73,10 +73,7 @@ public class IconGridPicker extends GuiBase
             FilterEngine.FOG_EFFECT_NIGHT_VISION, FilterEngine.FOG_EFFECT_PUMPKIN);
 
     /** Fixed HUD element ids understood by the HudElementFilter mixin (mirrors {@link #buildHud()}). */
-    private static final Set<String> HUD_IDS = Set.of(
-            "bossbar", "subtitles", "chat", "statusEffects", "crosshair", "hotbar",
-            "overlayMessage", "title", "scoreboard", "playerList", "demoTimer",
-            "heldItemTooltip", "fire", "nausea", "vignette");
+    private static final Set<String> HUD_IDS = FilterEngine.HUD_ELEMENT_IDS;
 
     private final FKind kind;
     private final ConfigStringList cfg;

@@ -138,6 +138,15 @@ public class FilterEngine {
     /** Cached HUD element ids from HIDDEN_HUD_ELEMENTS (Set lookup, rebuilt on config change). */
     private static volatile Set<String> hidden_Hud_Elements = Set.of();
 
+    /**
+     * Fixed HUD element ids understood by the HudElementFilter mixin and the
+     * coordinate filter's HUD category (mirrors IconGridPicker.buildHud).
+     */
+    public static final Set<String> HUD_ELEMENT_IDS = Set.of(
+            "bossbar", "subtitles", "chat", "statusEffects", "crosshair", "hotbar",
+            "overlayMessage", "title", "scoreboard", "playerList", "demoTimer",
+            "heldItemTooltip", "fire", "nausea", "vignette");
+
     private static volatile boolean dirty = true;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FilterEngine.class);
@@ -232,18 +241,46 @@ public class FilterEngine {
     }
 
     /**
-     * Returns true when the given HUD element id should be hidden: the master
-     * "Disable HUD Elements" toggle must be on AND the id must appear in the
-     * HIDDEN_HUD_ELEMENTS list (an empty list hides nothing). The list is
-     * cached as a Set so the per-frame lookup is O(1) instead of a linear scan.
+     * Returns true when the given HUD element id should be hidden. Layers, in
+     * order:
+     * <ol>
+     *   <li>reveal hotkey behavior: BYPASS / INACTIVE restore normal rendering,
+     *       FORCE hides everything (like every other category).</li>
+     *   <li>the global filter: the "Disable HUD Elements" toggle must be on AND
+     *       the {@link RenderConfig.Filters#HUD_MODE} decides how the
+     *       HIDDEN_HUD_ELEMENTS list applies (off: every element is hidden;
+     *       blacklist: the listed ids are hidden; whitelist: only the listed
+     *       ids stay visible).</li>
+     *   <li>the coordinate (condition system) filter: hide/keep entries whose
+     *       attached ids include HUD element ids act on the elements while the
+     *       player stands inside the region. It is independent of the master
+     *       toggle.</li>
+     * </ol>
      */
     public static boolean isHudElementHidden(String id) {
-        // 主开关关闭时（最常见路径）直接短路，跳过缓存脏检查。
-        if (!RenderConfig.Toggles.DISABLE_HUD_ELEMENTS.getBooleanValue()) {
+        if (id == null) {
             return false;
         }
-        rebuild();
-        return hidden_Hud_Elements.contains(id);
+        // 揭示热键行为：与其它类别一致（每帧缓存一次按键状态）。
+        int bh = hotkey_Behavior(TYPE_HUD_ELEMENTS, revealDown());
+        if (bh != HOTKEY_BEHAVIOR_NORMAL) {
+            return bh == HOTKEY_BEHAVIOR_FORCE;
+        }
+        // 全局过滤：主开关 + 关闭/黑名单/白名单模式。
+        if (RenderConfig.Toggles.DISABLE_HUD_ELEMENTS.getBooleanValue()) {
+            rebuild();
+            BaseOptionListConfigValue mode = RenderConfig.Filters.HUD_MODE.getOptionValue();
+            if (mode == RenderConfig.Filters.MODE_OFF) {
+                // 关闭模式：隐藏全部 HUD 元素。
+                return true;
+            }
+            boolean inList = hidden_Hud_Elements.contains(id);
+            if ((mode == RenderConfig.Filters.MODE_WHITELIST) != inList) {
+                return true;
+            }
+        }
+        // 区域条件：独立于主开关。
+        return CoordinateFilter.isHudElementHidden(id);
     }
 
     private static boolean isFiltered(BaseOptionListConfigValue mode, Set<String> list, String id) {

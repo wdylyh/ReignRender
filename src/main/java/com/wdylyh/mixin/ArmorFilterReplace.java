@@ -67,7 +67,7 @@ public class ArmorFilterReplace {
         // No master-switch gate: the coordinate rules below are gated by the
         // coordinate replace toggle (global switch OFF), the global fallback
         // checks the master switch internally.
-        if (stk == null || stk.isEmpty()) {
+        if (stk == null || stk.isEmpty() || !ReplacementEngine.anyReplaceActive()) {
             return stk;
         }
         // The reveal hotkey skips the replacement (shows the original armor).

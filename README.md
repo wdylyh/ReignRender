@@ -97,13 +97,15 @@
 
 ---
 
-**名单过滤 / List Filtering**
-
-| # | 类别 / Category | 说明 / Description |
-|---|------|------|
-| 1 | 关闭 / Off | 不启用名单功能 / Do not enable list filtering |
-| 2 | 黑名单 / Blacklist | 仅禁止渲染名单内 id / Only disable rendering of IDs in the list |
-| 3 | 白名单 / Whitelist | 仅**不**禁止渲染名单内 id / Only **do not** disable rendering of IDs in the list |
+**条件系统**
+| 条目 | 描述 |
+|------|------|
+| **区域** | 控制影响的区域 |
+| **距离** | 控制影响的距离 |
+| **数量** | 控制影响的数量 |
+| **ID** | 控制名单id |
+| **动作** | 控制名单模式，渲染模式|
+| **替换规则** | 控制替换渲染 |
 
 ---
 

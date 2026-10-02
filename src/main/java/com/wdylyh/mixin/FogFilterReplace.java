@@ -84,7 +84,8 @@ public abstract class FogFilterReplace {
         // No master-switch gate here: the coordinate rules below are gated by
         // the coordinate replace toggle (global switch OFF), the global
         // fallback checks the master switch internally.
-        if (!FilterEngine.isReplaceBlocked(FilterEngine.TYPE_FOG)) {
+        if (ReplacementEngine.anyReplaceActive()
+                && !FilterEngine.isReplaceBlocked(FilterEngine.TYPE_FOG)) {
             FOG_IDENTITIES.clear();
             FilterEngine.getFogIdentities(cam.getSubmersionType(), world, cam.getCameraPos(), FOG_IDENTITIES);
             Vector4f col = cir.getReturnValue();

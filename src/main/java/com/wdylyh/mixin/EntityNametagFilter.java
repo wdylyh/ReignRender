@@ -56,7 +56,8 @@ public abstract class EntityNametagFilter {
         // checks the master switch internally.
         {
             // The reveal hotkey skips the replacement (shows the original name).
-            if (FilterEngine.isReplaceBlocked(FilterEngine.TYPE_NAME_TAGS)) {
+            if (!ReplacementEngine.anyReplaceActive()
+                    || FilterEngine.isReplaceBlocked(FilterEngine.TYPE_NAME_TAGS)) {
                 return;
             }
             // Coordinate aware rules win over the global list: a rule inside

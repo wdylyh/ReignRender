@@ -55,7 +55,8 @@ public abstract class PlayerNametagFilter {
         // checks the master switch internally.
         {
             // The reveal hotkey skips the replacement (shows the original name).
-            if (FilterEngine.isReplaceBlocked(FilterEngine.TYPE_PLAYER_NAMES)) {
+            if (!ReplacementEngine.anyReplaceActive()
+                    || FilterEngine.isReplaceBlocked(FilterEngine.TYPE_PLAYER_NAMES)) {
                 return;
             }
             // Coordinate aware rules win over the global list, exactly like

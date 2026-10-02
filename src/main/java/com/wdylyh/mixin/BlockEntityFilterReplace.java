@@ -76,12 +76,14 @@ public class BlockEntityFilterReplace {
             // matched by its backing block id at its own position, with the
             // per-frame count budget (same as entities/particles). The
             // distance check uses the camera position sampled once per frame.
-            net.minecraft.util.math.BlockPos bPos = be.getPos();
-            String beId = FilterEngine.getBlockId(be.getCachedState().getBlock());
-            if (ConditionEngine.isCountExceeded(beId, bPos.getX(), bPos.getY(), bPos.getZ())
-                    || ConditionEngine.isBlockDistanceExceeded(beId,
-                            bPos.getX(), bPos.getY(), bPos.getZ())) {
-                cbr.cancel();
+            if (ConditionEngine.limitsActive()) {
+                net.minecraft.util.math.BlockPos bPos = be.getPos();
+                String beId = FilterEngine.getBlockId(be.getCachedState().getBlock());
+                if (ConditionEngine.isCountExceeded(beId, bPos.getX(), bPos.getY(), bPos.getZ())
+                        || ConditionEngine.isBlockDistanceExceeded(beId,
+                                bPos.getX(), bPos.getY(), bPos.getZ())) {
+                    cbr.cancel();
+                }
             }
         }
     }
@@ -98,7 +100,7 @@ public class BlockEntityFilterReplace {
         // No master-switch gate: the coordinate rules below are gated by the
         // coordinate replace toggle (global switch OFF), the global fallback
         // checks the master switch internally.
-        if (be == null) {
+        if (be == null || !ReplacementEngine.anyReplaceActive()) {
             return be;
         }
         boolean kd = FilterEngine.revealDown();

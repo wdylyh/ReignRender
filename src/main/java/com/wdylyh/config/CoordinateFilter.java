@@ -2,9 +2,12 @@ package com.wdylyh.config;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.particle.ParticleType;
@@ -60,6 +63,8 @@ public class CoordinateFilter {
     public static final int CAT_FLUID = 3;
     /** Not a registry id of any tracked registry: matched against name tag / player name text. */
     public static final int CAT_TEXT = 4;
+    /** HUD element id ("hotbar", "bossbar", ...): matched while the player stands in the region. */
+    public static final int CAT_HUD = 5;
 
     private static volatile boolean dirty = true;
     private static volatile Entry[] entries = new Entry[0];
@@ -203,6 +208,9 @@ public class CoordinateFilter {
         boolean entity = id != null && Registries.ENTITY_TYPE.containsId(id);
         boolean particle = id != null && Registries.PARTICLE_TYPE.containsId(id);
         boolean fluid = id != null && Registries.FLUID.containsId(id);
+        // HUD 元素 id（"hotbar" 等，见 FilterEngine.HUD_ELEMENT_IDS）。它们不是
+        // 渲染注册表条目，单独标记；大小写不敏感比较（HUD id 本身全小写）。
+        boolean hud = FilterEngine.HUD_ELEMENT_IDS.contains(trimmed.toLowerCase(Locale.ROOT));
 
         // The registry lookup is done on the canonical form so "stone" and
         // "minecraft:stone" are treated as the same block id. An id that
@@ -210,7 +218,7 @@ public class CoordinateFilter {
         // "bot" parses as "minecraft:bot" but must still be matched against
         // name tag / player name text ("bot") by the CAT_TEXT category.
         boolean registry = block || entity || particle || fluid;
-        return new Id(registry ? id.toString() : trimmed, block, entity, particle, fluid);
+        return new Id(registry ? id.toString() : trimmed, trimmed, block, entity, particle, fluid, hud);
     }
 
     // ==================== 查询 (Queries) ====================
@@ -309,6 +317,25 @@ public class CoordinateFilter {
         return false;
     }
 
+    /**
+     * Returns true when the given HUD element should be hidden by a coordinate
+     * entry while the player stands inside its region. HUD elements have no
+     * world position of their own, so the region is matched against the
+     * player's position: a hide (blacklist) entry with attached HUD ids hides
+     * them in the region, a keep (whitelist) entry only leaves the attached
+     * ids visible there. Independent of the per-category master toggles.
+     */
+    public static boolean isHudElementHidden(String hudId) {
+        if (!active() || hudId == null) {
+            return false;
+        }
+        ClientPlayerEntity player = MinecraftClient.getInstance().player;
+        if (player == null) {
+            return false;
+        }
+        return hiddenAt(CAT_HUD, hudId, player.getX(), player.getY(), player.getZ());
+    }
+
     private static boolean hiddenAt(int cat, String id, double x, double y, double z) {
         rebuild();
         if (entries.length == 0) {
@@ -369,6 +396,13 @@ public class CoordinateFilter {
                         return true;
                     }
                 }
+                case CAT_HUD -> {
+                    // HUD 元素 id：用原始输入文本匹配（"fire" 同时也是方块 id，
+                    // 规范化为 "minecraft:fire" 后无法再匹配 HUD id）。
+                    if (a.hud && a.raw.equalsIgnoreCase(id)) {
+                        return true;
+                    }
+                }
                 default -> {
                 }
             }
@@ -400,17 +434,22 @@ public class CoordinateFilter {
     /** One attached id with the render categories it resolves to. */
     private static class Id {
         final String text;
+        /** The raw trimmed input text (used by the HUD element matching). */
+        final String raw;
         final boolean block;
         final boolean entity;
         final boolean particle;
         final boolean fluid;
+        final boolean hud;
 
-        Id(String text, boolean block, boolean entity, boolean particle, boolean fluid) {
+        Id(String text, String raw, boolean block, boolean entity, boolean particle, boolean fluid, boolean hud) {
             this.text = text;
+            this.raw = raw;
             this.block = block;
             this.entity = entity;
             this.particle = particle;
             this.fluid = fluid;
+            this.hud = hud;
         }
     }
 }

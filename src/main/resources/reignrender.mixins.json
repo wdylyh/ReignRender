@@ -12,6 +12,7 @@
 		"FluidHideFilter",
 		"ArmorFilterReplace",
 		"HeldItemHide",
+		"FirstPersonHeldItemHide",
 		"HeldItemReplace",
 		"ElytraHide",
 		"ToastOverlay",
